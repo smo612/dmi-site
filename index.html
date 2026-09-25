@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-TW" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>台股 DMI / MACD 盤後掃描</title>
+<meta name="description" content="台股 DMI 與 MACD 盤後掃描結果（五個週期），個人研究用途。">
+<meta name="robots" content="noindex, nofollow">
+<style>
+/* Visual language from the DMI Web Cards page; static, read-only build for GitHub Pages. */
+:root,[data-theme="light"]{
+  --bg:#eff3f8;--panel:#fff;--panel-2:#f8fafc;--card:#fff;--line:#dbe5ef;--line-2:#c7d4e3;
+  --text:#132238;--text-dim:#506275;--text-mute:#7f91a6;--shadow:0 10px 30px rgba(16,24,40,.08);
+  --green:#18a058;--green-soft:#edf9f1;--blue:#2f6fed;--blue-soft:#eef4ff;--amber:#b97813;--amber-soft:#fff5df;
+  --red:#d9485f;--red-soft:#fff1f3;--violet:#7a3ff2;--violet-soft:#f4efff;
+  --panel-scale:1.12;font-family:Inter,"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1320;--panel:#121b2b;--panel-2:#172233;--card:#121b2b;--line:#223247;--line-2:#32455f;
+  --text:#ebf3ff;--text-dim:#9fb1c6;--text-mute:#6d8098;--shadow:0 10px 30px rgba(0,0,0,.28);
+  --green:#4ade80;--green-soft:rgba(74,222,128,.12);--blue:#7ea8ff;--blue-soft:rgba(126,168,255,.14);
+  --amber:#ffc759;--amber-soft:rgba(255,199,89,.13);--red:#ff8aa0;--red-soft:rgba(255,138,160,.12);
+  --violet:#c59dff;--violet-soft:rgba(197,157,255,.14)}}
+[data-theme="dark"]{
+  --bg:#0c1320;--panel:#121b2b;--panel-2:#172233;--card:#121b2b;--line:#223247;--line-2:#32455f;
+  --text:#ebf3ff;--text-dim:#9fb1c6;--text-mute:#6d8098;--shadow:0 10px 30px rgba(0,0,0,.28);
+  --green:#4ade80;--green-soft:rgba(74,222,128,.12);--blue:#7ea8ff;--blue-soft:rgba(126,168,255,.14);
+  --amber:#ffc759;--amber-soft:rgba(255,199,89,.13);--red:#ff8aa0;--red-soft:rgba(255,138,160,.12);
+  --violet:#c59dff;--violet-soft:rgba(197,157,255,.14)}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{min-height:100vh;color:var(--text);background:var(--bg)}
+button,input,select{font:inherit}button{cursor:pointer}
+.app{display:grid;grid-template-columns:310px minmax(0,1fr);min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;overflow:auto;background:var(--panel);border-right:1px solid var(--line)}
+.side-header{padding:20px 22px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:-.02em}
+.brand-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 6px color-mix(in srgb,var(--green) 20%,transparent)}
+.theme-btn,.quiet-btn{border:1px solid var(--line-2);background:var(--panel-2);color:var(--text-dim);padding:8px 12px;border-radius:12px}
+.data-chip{margin:14px 22px 0;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2);color:var(--text-dim);font-size:12px;line-height:1.6}
+.section{padding:18px 22px 0}.section-label{margin-bottom:10px;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--text-mute)}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.seg-btn,.tf-btn,.opt-btn{border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);border-radius:14px;padding:calc(10px * var(--panel-scale)) 8px;font-size:calc(13px * var(--panel-scale));font-weight:600}
+.seg-btn.active,.tf-btn.active,.opt-btn.active{color:var(--green);border-color:color-mix(in srgb,var(--green) 48%,var(--line));background:var(--green-soft)}
+body.s-macd .seg-btn.active,body.s-macd .tf-btn.active,body.s-macd .opt-btn.active{color:var(--blue);border-color:color-mix(in srgb,var(--blue) 48%,var(--line));background:var(--blue-soft)}
+.side-data{padding:18px 22px 26px;font-size:11px;line-height:1.7;color:var(--text-mute)}.side-data p{margin:6px 0}.side-data strong{color:var(--text-dim)}
+.content{min-width:0;display:flex;flex-direction:column}
+.stats-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:16px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+.stat-card{min-width:70px;display:flex;flex-direction:column;align-items:center}.stat-value{font-size:28px;font-weight:700;line-height:1;color:var(--green)}body.s-macd .stat-value{color:var(--blue)}
+.stat-label{margin-top:3px;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text-mute)}
+.stat-divider{width:1px;height:36px;background:var(--line)}.meta{margin-left:auto;font-size:12px;line-height:1.7;color:var(--text-mute);white-space:pre-line}
+.banner{margin:18px 24px 0;padding:14px 16px;border-radius:16px;font-size:14px;line-height:1.65}
+.banner.stale{border:1px solid color-mix(in srgb,var(--red) 55%,var(--line));background:var(--red-soft);color:var(--red);font-weight:700}
+.banner.note{border:1px solid color-mix(in srgb,var(--amber) 40%,var(--line));background:var(--amber-soft);color:var(--text-dim);font-size:13px}
+.banner[hidden]{display:none}
+.tools-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 24px;border-bottom:1px solid var(--line)}
+.search,.sort-select{border:1px solid var(--line);border-radius:16px;padding:12px 14px;background:var(--panel);color:var(--text)}
+.search{flex:1 1 240px;min-width:180px}.sort-select{min-width:150px}
+.cards-wrap{flex:1;padding:20px 24px 28px}.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{display:block;color:inherit;text-decoration:none;border:1px solid var(--line);border-radius:20px;background:var(--card);box-shadow:var(--shadow);overflow:hidden}
+.card:hover,.card:focus-visible{border-color:color-mix(in srgb,var(--green) 45%,var(--line));outline:none}
+.card-head{padding:16px 18px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}.card-code{font-size:20px;font-weight:700}
+.card-name{flex:1;min-width:0;font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.market-tag{padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-soft)}.market-tag.two{color:var(--violet);background:var(--violet-soft)}
+.card-body{padding:14px 18px;display:grid;gap:10px}.body-row{display:flex;align-items:baseline;justify-content:space-between;gap:18px}
+.body-label{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text-mute)}.body-value{text-align:right;font-size:13px;font-weight:600;color:var(--text-dim)}
+.card-footer{padding:12px 18px 16px;display:flex;gap:8px;flex-wrap:wrap;background:var(--panel-2);border-top:1px solid var(--line)}
+.chip{padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700;color:var(--text-dim);background:var(--panel);border:1px solid var(--line-2)}
+.chip.lead{color:var(--green);background:var(--green-soft);border-color:transparent}body.s-macd .chip.lead{color:var(--blue);background:var(--blue-soft)}
+.empty{padding:64px 16px;text-align:center;color:var(--text-mute);border:1px dashed var(--line-2);border-radius:20px;background:var(--panel)}
+.empty h3{margin:0 0 8px;font-size:20px;color:var(--text)}.empty p{margin:0;line-height:1.8;font-size:14px}
+.footer{padding:0 24px 28px;font-size:12px;line-height:1.7;color:var(--text-mute)}
+@media(max-width:980px){.app{grid-template-columns:1fr}.sidebar{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}}
+@media(max-width:700px){.stats-bar,.tools-bar,.cards-wrap,.footer{padding-left:16px;padding-right:16px}.banner{margin-left:16px;margin-right:16px}
+  .cards-grid{grid-template-columns:1fr}.meta{width:100%;margin-left:0}.search,.sort-select{width:100%}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="side-header">
+      <div class="brand"><span class="brand-dot"></span><span>台股 DMI / MACD</span></div>
+      <button id="theme-btn" class="theme-btn" type="button">夜間</button>
+    </div>
+    <div id="data-chip" class="data-chip">讀取資料中…</div>
+    <div class="section"><div class="section-label">策略</div><div class="grid-2" id="strategy-buttons"></div></div>
+    <div class="section"><div class="section-label">K 週期</div><div class="grid-2" id="timeframe-buttons"></div></div>
+    <div class="section" id="mode-section"><div class="section-label">DMI 模式</div><div class="grid-2" id="mode-buttons"></div></div>
+    <div class="section"><div class="section-label">幾根 K 棒內觸發</div><div class="grid-2" id="window-buttons"></div></div>
+    <div class="section"><div class="section-label">最低成交量（最新日 K）</div><div class="grid-2" id="volume-buttons"></div></div>
+    <div class="side-data"><p><strong>各週期最新 K 棒</strong></p><div id="latest-bars"></div><p id="generated"></p></div>
+  </aside>
+  <main class="content">
+    <div class="stats-bar">
+      <div class="stat-card"><div id="hits-value" class="stat-value">0</div><div class="stat-label">命中</div></div>
+      <div class="stat-divider"></div>
+      <div class="stat-card"><div id="scan-value" class="stat-value">0</div><div class="stat-label">掃描檔數</div></div>
+      <div class="stat-divider"></div>
+      <div class="stat-card"><div id="short-value" class="stat-value">0</div><div class="stat-label">資料不足</div></div>
+      <div id="meta" class="meta"></div>
+    </div>
+    <div id="stale-banner" class="banner stale" role="alert" hidden></div>
+    <div id="notice" class="banner note"></div>
+    <div class="tools-bar">
+      <input id="search-input" class="search" type="search" placeholder="搜尋代碼 / 股名…" aria-label="搜尋代碼或股名">
+      <select id="sort-select" class="sort-select" aria-label="結果排序"></select>
+    </div>
+    <div class="cards-wrap"><div id="cards-area" class="empty"><h3>讀取中…</h3><p>正在載入已預先算好的掃描結果。</p></div></div>
+    <div class="footer" id="footer"></div>
+  </main>
+</div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const TF_NAMES = {"1d":"日K","240m":"240m","60m":"60m","30m":"30m","15m":"15m"};
+const TF_ORDER = ["15m","30m","60m","240m","1d"];
+const STRATEGY_NAMES = {dmi:"DMI", macd:"MACD"};
+const MODE_NAMES = {cross:"確認金叉", ready:"準備金叉"};
+const state = {manifest:null, loadError:null, strategy:"dmi", timeframe:"1d", mode:"cross", window:null, minVolume:null, run:null, cache:{}};
+const DISCLAIMER = "本站為個人研究用途的盤後技術指標掃描結果，僅供參考，不構成投資建議；非即時資料，可能有誤或延遲；與臺灣證券交易所、證券櫃檯買賣中心及資料來源無關。";
+
+function setTheme(theme){
+  document.documentElement.setAttribute("data-theme", theme);
+  $("theme-btn").textContent = theme === "dark" ? "日間" : "夜間";
+  try { localStorage.setItem("dmiSiteTheme", theme); } catch (e) {}
+}
+function el(tag, cls, text){ const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
+function uniq(list){ return [...new Set(list)]; }
+function available(filter){ return state.manifest.combos.filter(filter); }
+
+function showStale(message){ const b = $("stale-banner"); b.textContent = "⚠ " + message; b.hidden = false; }
+// BEGIN staleReason (pure; exercised by deploy/tests/js/test_site_stale.mjs)
+function staleReason(m, nowMs, loadError){
+  if (!m) return "無法讀取資料清單（manifest.json），目前無法確認結果是否為最新。";
+  const shown = "目前顯示 " + (m.data_date || "未知日期") + " 的結果";
+  if (loadError) return "無法確認最新資料：重新讀取資料清單失敗（" + loadError + "），" + shown + "，可能已過期。";
+  const status = m.update_status;
+  if (status && status.stale === true) return status.message || ("資料已過期，" + shown + "。");
+  const deadline = Date.parse(m.stale_after);
+  if (!Number.isFinite(deadline) || nowMs > deadline)
+    return "資料未如期更新（預期最晚 " + (m.stale_after || "未知") + "），" + shown + "，可能已過期。";
+  return null;
+}
+// END staleReason
+function checkStale(){
+  const reason = staleReason(state.manifest, Date.now(), state.loadError);
+  if (reason) showStale(reason); else $("stale-banner").hidden = true;
+}
+
+function buttons(container, values, current, label, onPick){
+  const box = $(container); box.replaceChildren();
+  values.forEach(v => {
+    const b = el("button", "opt-btn" + (v === current ? " active" : ""), label(v));
+    b.type = "button"; b.addEventListener("click", () => onPick(v)); box.append(b);
+  });
+}
+function pickValid(){
+  const m = state.manifest;
+  const byStrategy = available(c => c.strategy === state.strategy);
+  if (!byStrategy.some(c => c.timeframe === state.timeframe)) state.timeframe = byStrategy[0].timeframe;
+  const modes = uniq(byStrategy.filter(c => c.timeframe === state.timeframe).map(c => c.mode));
+  if (!modes.includes(state.mode)) state.mode = modes[0];
+  const scope = byStrategy.filter(c => c.timeframe === state.timeframe && c.mode === state.mode);
+  const windows = uniq(scope.map(c => c.window)).sort((a, b) => a - b);
+  if (!windows.includes(state.window)) state.window = windows.includes(3) ? 3 : windows[0];
+  const vols = uniq(scope.filter(c => c.window === state.window).map(c => c.min_volume)).sort((a, b) => b - a);
+  if (!vols.includes(state.minVolume)) state.minVolume = vols[0];
+  return {modes, windows, vols};
+}
+function renderControls(){
+  const m = state.manifest;
+  document.body.classList.toggle("s-macd", state.strategy === "macd");
+  const strategies = uniq(m.combos.map(c => c.strategy));
+  const {modes, windows, vols} = pickValid();
+  buttons("strategy-buttons", strategies, state.strategy, s => STRATEGY_NAMES[s] || s, v => { state.strategy = v; refresh(); });
+  const tfs = TF_ORDER.filter(tf => available(c => c.strategy === state.strategy && c.timeframe === tf).length);
+  buttons("timeframe-buttons", tfs, state.timeframe, tf => TF_NAMES[tf] || tf, v => { state.timeframe = v; refresh(); });
+  $("mode-section").hidden = modes.length < 2;
+  buttons("mode-buttons", modes, state.mode, md => MODE_NAMES[md] || md, v => { state.mode = v; refresh(); });
+  buttons("window-buttons", windows, state.window, w => w + " 根內", v => { state.window = v; refresh(); });
+  buttons("volume-buttons", vols, state.minVolume, v => v === 0 ? "不限" : "≥ " + v.toLocaleString() + " 張", v => { state.minVolume = v; refresh(); });
+}
+function currentCombo(){
+  return state.manifest.combos.find(c => c.strategy === state.strategy && c.timeframe === state.timeframe &&
+    c.mode === state.mode && c.window === state.window && c.min_volume === state.minVolume);
+}
+async function loadRun(combo){
+  if (state.cache[combo.id]) return state.cache[combo.id];
+  const response = await fetch(combo.file, {cache: "no-cache"});
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const data = await response.json();
+  state.cache[combo.id] = data;
+  return data;
+}
+function hasField(name){ return state.manifest.fields.includes(name); }
+function renderSortOptions(){
+  const select = $("sort-select"), current = select.value || "trigger_desc";
+  const options = [["trigger_desc", "最新觸發"], ["ticker_asc", "代碼排序"]];
+  if (hasField("volume")) options.push(["volume_desc", "成交量高到低"]);
+  if (hasField("close")) options.push(["close_desc", "收盤高到低"]);
+  select.replaceChildren(...options.map(([v, t]) => { const o = el("option", "", t); o.value = v; return o; }));
+  select.value = options.some(o => o[0] === current) ? current : "trigger_desc";
+}
+function row(parent, label, value){ const r = el("div", "body-row"); r.append(el("div", "body-label", label), el("div", "body-value", value)); parent.append(r); }
+function card(hit){
+  const code = String(hit.symbol || "").replace(/\.(TW|TWO)$/i, "");
+  const a = el("a", "card"); a.href = "https://tw.stock.yahoo.com/quote/" + encodeURIComponent(code);
+  a.target = "_blank"; a.rel = "noopener noreferrer";
+  const head = el("div", "card-head");
+  head.append(el("div", "card-code", code), el("div", "card-name", hit.name || code),
+    el("span", "market-tag" + (hit.market === "上櫃" ? " two" : ""), hit.market || ""));
+  const body = el("div", "card-body");
+  row(body, "觸發 K 棒", hit.trigger_time || "-");
+  row(body, "最新 K 棒", hit.latest_bar || "-");
+  if (hit.close !== undefined) row(body, "最新收盤", Number(hit.close).toFixed(2));
+  if (hit.volume !== undefined) row(body, "K 量", Math.floor((Number(hit.volume) || 0) / 1000).toLocaleString() + " 張");
+  if (hit.daily_volume !== undefined && hit.daily_volume !== null) row(body, "日 K 量", Math.floor(Number(hit.daily_volume) / 1000).toLocaleString() + " 張");
+  const foot = el("div", "card-footer"), d = hit.details || {};
+  if (state.strategy === "dmi") {
+    foot.append(el("span", "chip lead", MODE_NAMES[state.mode] || ""), el("span", "chip", "+DI " + d.di_plus),
+      el("span", "chip", "-DI " + d.di_minus), el("span", "chip", "差 " + d.dmi_diff));
+  } else {
+    foot.append(el("span", "chip lead", "MACD 金叉"), el("span", "chip", "MACD " + d.macd), el("span", "chip", "Signal " + d.signal));
+  }
+  a.append(head, body, foot);
+  return a;
+}
+function renderCards(){
+  const area = $("cards-area"), run = state.run;
+  if (!run) return;
+  const q = $("search-input").value.trim().toLowerCase();
+  const hits = run.hits.filter(h => (String(h.symbol) + " " + String(h.name || "")).toLowerCase().includes(q));
+  const sort = $("sort-select").value;
+  if (sort === "ticker_asc") hits.sort((a, b) => String(a.symbol).localeCompare(String(b.symbol)));
+  else if (sort === "volume_desc") hits.sort((a, b) => Number(b.volume) - Number(a.volume));
+  else if (sort === "close_desc") hits.sort((a, b) => Number(b.close) - Number(a.close));
+  area.replaceChildren();
+  if (!hits.length) {
+    area.className = "empty";
+    area.append(el("h3", "", q && run.hits.length ? "沒有符合搜尋的結果" : "這個條件沒有命中"),
+      el("p", "", "本次掃描 " + run.universe_count + " 檔；0 命中代表在此條件下沒有符合的股票。"));
+    return;
+  }
+  area.className = "cards-grid";
+  hits.forEach(h => area.append(card(h)));
+}
+async function refresh(){
+  renderControls();
+  const combo = currentCombo();
+  if (!combo) return;
+  $("meta").textContent = TF_NAMES[combo.timeframe] + " · " + (STRATEGY_NAMES[combo.strategy]) +
+    (combo.strategy === "dmi" ? " " + MODE_NAMES[combo.mode] : " 金叉") + " · " + combo.window + " 根內 · " +
+    (combo.min_volume ? "日 K 量 ≥ " + combo.min_volume.toLocaleString() + " 張" : "成交量不限");
+  try {
+    const run = await loadRun(combo);
+    if (currentCombo() !== combo) return;
+    state.run = run;
+    $("hits-value").textContent = run.hit_count;
+    $("scan-value").textContent = run.universe_count;
+    $("short-value").textContent = run.insufficient_count;
+    renderCards();
+  } catch (e) {
+    state.run = null;
+    const area = $("cards-area"); area.className = "empty";
+    area.replaceChildren(el("h3", "", "無法讀取這個條件的結果"), el("p", "", String(e.message || e)));
+  }
+}
+function renderInfo(){
+  const m = state.manifest;
+  $("data-chip").textContent = "資料日期 " + (m.data_date || "未知") + "｜盤後更新";
+  const latest = $("latest-bars"); latest.replaceChildren();
+  TF_ORDER.forEach(tf => latest.append(el("p", "", (TF_NAMES[tf] || tf) + "：" + ((m.latest_bar || {})[tf] || "無"))));
+  $("generated").textContent = "產生時間 " + (m.generated_at || "未知");
+  $("notice").textContent = DISCLAIMER + " 命中名單會隨下一個交易日的資料更新。";
+  $("footer").textContent = "指標：DMI（Wilder 14）、MACD（12/26/9）。資料更新時間與過期狀態以本頁上方顯示為準。" + DISCLAIMER;
+  renderSortOptions();
+}
+async function loadManifest(){
+  try {
+    const response = await fetch("manifest.json", {cache: "no-cache"});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const m = await response.json();
+    if (!m || !Array.isArray(m.combos) || !m.combos.length) throw new Error("清單內容不完整");
+    const changed = !state.manifest || state.manifest.generated_at !== m.generated_at;
+    state.manifest = m;
+    state.loadError = null;
+    if (changed) { state.cache = {}; renderInfo(); await refresh(); }
+  } catch (e) {
+    state.loadError = String(e.message || e);  // keep the old view, but say it can no longer be confirmed
+    if (!state.manifest) {
+      const area = $("cards-area"); area.className = "empty";
+      area.replaceChildren(el("h3", "", "無法讀取掃描結果"), el("p", "", String(e.message || e)));
+    }
+  }
+  checkStale();
+}
+$("theme-btn").addEventListener("click", () => setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark"));
+$("search-input").addEventListener("input", renderCards);
+$("sort-select").addEventListener("change", renderCards);
+let savedTheme = null;
+try { savedTheme = localStorage.getItem("dmiSiteTheme"); } catch (e) {}
+setTheme(savedTheme === "dark" || (!savedTheme && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light");
+loadManifest();
+setInterval(loadManifest, 10 * 60 * 1000);
+setInterval(checkStale, 60 * 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,1403 @@
+<!doctype html>
+<html lang="zh-TW" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>台股 DMI / MACD 盤後掃描</title>
+<meta name="description" content="台股 DMI 與 MACD 盤後掃描結果（五個週期），個人研究用途。">
+<meta name="robots" content="noindex, nofollow">
+<style>
+/* Visual language from the DMI Web Cards page; static, read-only build for GitHub Pages. */
+:root,[data-theme="light"]{
+  --bg:#eff3f8;--panel:#fff;--panel-2:#f8fafc;--card:#fff;--line:#dbe5ef;--line-2:#c7d4e3;
+  --text:#132238;--text-dim:#506275;--text-mute:#7f91a6;--shadow:0 10px 30px rgba(16,24,40,.08);
+  --green:#18a058;--green-soft:#edf9f1;--blue:#2f6fed;--blue-soft:#eef4ff;--amber:#b97813;--amber-soft:#fff5df;
+  --red:#d9485f;--red-soft:#fff1f3;--violet:#7a3ff2;--violet-soft:#f4efff;
+  --panel-scale:1.12;font-family:Inter,"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1320;--panel:#121b2b;--panel-2:#172233;--card:#121b2b;--line:#223247;--line-2:#32455f;
+  --text:#ebf3ff;--text-dim:#9fb1c6;--text-mute:#6d8098;--shadow:0 10px 30px rgba(0,0,0,.28);
+  --green:#4ade80;--green-soft:rgba(74,222,128,.12);--blue:#7ea8ff;--blue-soft:rgba(126,168,255,.14);
+  --amber:#ffc759;--amber-soft:rgba(255,199,89,.13);--red:#ff8aa0;--red-soft:rgba(255,138,160,.12);
+  --violet:#c59dff;--violet-soft:rgba(197,157,255,.14)}}
+[data-theme="dark"]{
+  --bg:#0c1320;--panel:#121b2b;--panel-2:#172233;--card:#121b2b;--line:#223247;--line-2:#32455f;
+  --text:#ebf3ff;--text-dim:#9fb1c6;--text-mute:#6d8098;--shadow:0 10px 30px rgba(0,0,0,.28);
+  --green:#4ade80;--green-soft:rgba(74,222,128,.12);--blue:#7ea8ff;--blue-soft:rgba(126,168,255,.14);
+  --amber:#ffc759;--amber-soft:rgba(255,199,89,.13);--red:#ff8aa0;--red-soft:rgba(255,138,160,.12);
+  --violet:#c59dff;--violet-soft:rgba(197,157,255,.14)}
+/* the treemap's own canvas follows the theme; the tiles keep the DC colours (red up, green down) */
+:root,[data-theme="light"]{--heat-bg:#f8fafc}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--heat-bg:#0b1220}}
+[data-theme="dark"]{--heat-bg:#0b1220}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{min-height:100vh;color:var(--text);background:var(--bg)}
+button,input,select{font:inherit}button{cursor:pointer}
+.app{display:grid;grid-template-columns:310px minmax(0,1fr);min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;overflow:auto;background:var(--panel);border-right:1px solid var(--line)}
+.side-header{padding:20px 22px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:-.02em}
+.brand-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 6px color-mix(in srgb,var(--green) 20%,transparent)}
+.theme-btn,.quiet-btn{border:1px solid var(--line-2);background:var(--panel-2);color:var(--text-dim);padding:8px 12px;border-radius:12px}
+.data-chip{margin:14px 22px 0;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2);color:var(--text-dim);font-size:12px;line-height:1.6}
+.section{padding:18px 22px 0}.section-label{margin-bottom:10px;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--text-mute)}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.seg-btn,.tf-btn,.opt-btn{border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);border-radius:14px;padding:calc(10px * var(--panel-scale)) 8px;font-size:calc(13px * var(--panel-scale));font-weight:600}
+.seg-btn.active,.tf-btn.active,.opt-btn.active{color:var(--green);border-color:color-mix(in srgb,var(--green) 48%,var(--line));background:var(--green-soft)}
+body.s-macd .seg-btn.active,body.s-macd .tf-btn.active,body.s-macd .opt-btn.active{color:var(--blue);border-color:color-mix(in srgb,var(--blue) 48%,var(--line));background:var(--blue-soft)}
+.side-data{padding:18px 22px 26px;font-size:11px;line-height:1.7;color:var(--text-mute)}.side-data p{margin:6px 0}.side-data strong{color:var(--text-dim)}
+.content{min-width:0;display:flex;flex-direction:column}
+.stats-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:16px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+.stat-card{min-width:70px;display:flex;flex-direction:column;align-items:center}.stat-value{font-size:28px;font-weight:700;line-height:1;color:var(--green)}body.s-macd .stat-value{color:var(--blue)}
+.stat-label{margin-top:3px;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text-mute)}
+.stat-divider{width:1px;height:36px;background:var(--line)}.meta{margin-left:auto;font-size:12px;line-height:1.7;color:var(--text-mute);white-space:pre-line}
+.banner{margin:18px 24px 0;padding:14px 16px;border-radius:16px;font-size:14px;line-height:1.65}
+.banner.stale{border:1px solid color-mix(in srgb,var(--red) 55%,var(--line));background:var(--red-soft);color:var(--red);font-weight:700}
+.banner.note{border:1px solid color-mix(in srgb,var(--amber) 40%,var(--line));background:var(--amber-soft);color:var(--text-dim);font-size:13px}
+.banner[hidden]{display:none}
+.tools-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 24px;border-bottom:1px solid var(--line)}
+.search,.sort-select{border:1px solid var(--line);border-radius:16px;padding:12px 14px;background:var(--panel);color:var(--text)}
+.search{flex:1 1 240px;min-width:180px}.sort-select{min-width:150px}
+.cards-wrap{flex:1;padding:20px 24px 28px}.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{display:block;color:inherit;text-decoration:none;border:1px solid var(--line);border-radius:20px;background:var(--card);box-shadow:var(--shadow);overflow:hidden}
+.card:hover,.card:focus-visible{border-color:color-mix(in srgb,var(--green) 45%,var(--line));outline:none}
+.card-head{padding:16px 18px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}.card-code{font-size:20px;font-weight:700}
+.card-name{flex:1;min-width:0;font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.market-tag{padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-soft)}.market-tag.two{color:var(--violet);background:var(--violet-soft)}
+.card-stale{padding:5px 10px;border-radius:8px;font-size:12px;font-weight:700;color:var(--amber);background:var(--amber-soft)}
+.card-body{padding:14px 18px;display:grid;gap:10px}.body-row{display:flex;align-items:baseline;justify-content:space-between;gap:18px}
+.body-label{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text-mute)}.body-value{text-align:right;font-size:13px;font-weight:600;color:var(--text-dim)}
+.card-footer{padding:12px 18px 16px;display:flex;gap:8px;flex-wrap:wrap;background:var(--panel-2);border-top:1px solid var(--line)}
+.chip{padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700;color:var(--text-dim);background:var(--panel);border:1px solid var(--line-2)}
+.chip.lead{color:var(--green);background:var(--green-soft);border-color:transparent}body.s-macd .chip.lead{color:var(--blue);background:var(--blue-soft)}
+.empty{padding:64px 16px;text-align:center;color:var(--text-mute);border:1px dashed var(--line-2);border-radius:20px;background:var(--panel)}
+.empty h3{margin:0 0 8px;font-size:20px;color:var(--text)}.empty p{margin:0;line-height:1.8;font-size:14px}
+.footer{padding:0 24px 28px;font-size:12px;line-height:1.7;color:var(--text-mute)}
+.cond-bar,.panel-foot{display:none}
+@media(max-width:700px){  /* phones: keep the first results on the first screen; nothing is removed, only compacted */
+  .content .latest-strip{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;padding-top:8px;padding-bottom:8px;scrollbar-width:none}
+  .content .latest-strip::-webkit-scrollbar{display:none}
+  .banner.note{font-size:12px;line-height:1.6;padding:10px 12px;margin-top:12px}
+  .stats-bar{gap:10px;padding-top:10px;padding-bottom:10px}
+  .tools-bar{flex-wrap:nowrap;gap:8px;padding-top:10px;padding-bottom:10px}
+  .tools-bar .search{flex:1 1 auto;min-width:0;width:auto;padding:10px 12px}
+  .tools-bar .sort-select{flex:0 0 40%;min-width:0;width:auto;padding:10px 8px}}
+@media(max-width:980px){.app{grid-template-columns:1fr}
+  /* results first: the controls live in a panel opened from a sticky condition bar (desktop is unchanged) */
+  .cond-bar{display:block;position:sticky;top:0;z-index:60;background:var(--panel);border-bottom:1px solid var(--line);box-shadow:0 4px 14px rgba(16,24,40,.08)}
+  .cond-toggle{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;color:var(--text);padding:10px 16px;text-align:left}
+  .cond-text{flex:1;min-width:0;display:grid;gap:2px}
+  .cond-date{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--text-mute)}
+  .cond-sum{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cond-open{flex:none;padding:8px 12px;border-radius:12px;border:1px solid color-mix(in srgb,var(--green) 45%,var(--line));background:var(--green-soft);color:var(--green);font-size:13px;font-weight:700}
+  .stats-bar{position:static}
+  .sidebar{position:fixed;left:0;right:0;top:var(--panel-top,56px);bottom:0;height:auto;z-index:55;overflow:auto;overscroll-behavior:contain;
+    border:0;border-top:1px solid var(--line);box-shadow:0 18px 40px rgba(0,0,0,.28);
+    opacity:0;visibility:hidden;transform:translateY(-10px);transition:opacity .15s,transform .15s,visibility 0s linear .15s}
+  body.panel-open .sidebar{opacity:1;visibility:visible;transform:none;transition:opacity .15s,transform .15s}
+  body.panel-open{overflow:hidden}
+  .panel-foot{display:block;position:sticky;bottom:0;padding:12px 22px 18px;background:linear-gradient(to top,var(--panel) 70%,transparent)}
+  .panel-foot .opt-btn{width:100%}
+  .heat-detail{scroll-margin-top:72px}}
+@media(max-width:700px){.stats-bar,.tools-bar,.cards-wrap,.footer,.latest-strip{padding-left:16px;padding-right:16px}.scan-hint{margin-left:16px;margin-right:16px}.banner{margin-left:16px;margin-right:16px}
+  .cards-grid{grid-template-columns:1fr}.meta{width:100%;margin-left:0}.search,.sort-select{width:100%}}
+.range-row{display:flex;align-items:center;gap:12px}.range-row input[type=range]{flex:1;accent-color:var(--green)}body.s-macd .range-row input[type=range]{accent-color:var(--blue)}
+.range-value{min-width:64px;text-align:right;font-size:calc(13px * var(--panel-scale));font-weight:700;color:var(--text-dim)}
+.num-input{width:100%;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--panel-2);color:var(--text);font-size:calc(13px * var(--panel-scale))}
+.hint{margin-top:6px;font-size:11px;line-height:1.6;color:var(--text-mute)}
+.gate{margin-top:10px}.gate [hidden]{display:none}.gate-link{background:none;border:0;padding:4px 0;color:var(--text-dim);font-size:12px;text-decoration:underline;cursor:pointer}
+.gate-form{display:grid;gap:8px;margin-top:6px}.gate-q{font-size:12px;color:var(--text-dim)}
+.gate-row{display:flex;gap:8px}.gate-row .num-input{flex:1;min-width:0}.gate-row .opt-btn{flex:none;padding-left:14px;padding-right:14px}
+.gate-msg{font-size:12px;line-height:1.6}.gate-msg.bad{color:var(--red)}.gate-msg.warn{color:var(--text-mute)}
+.cards-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.heat-wrap{display:grid;gap:14px}
+.opt-btn.wide{grid-column:1/-1}
+.overview{display:grid;gap:16px}
+.ov-section{border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:14px 16px}
+.ov-section h3{margin:0 0 4px;font-size:16px}
+.ov-date{margin-bottom:8px;font-size:12px;line-height:1.6;color:var(--text-mute)}
+.ov-warn{margin:2px 0 8px;font-size:12px;line-height:1.6;color:var(--red);font-weight:700}
+.ov-tf{padding:9px 0;border-top:1px solid var(--line)}
+.ov-tf-head{margin-bottom:6px;font-size:12px;font-weight:700;color:var(--text-dim)}
+.ov-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ov-chip{display:inline-flex;align-items:baseline;gap:6px;padding:4px 9px;border-radius:999px;border:1px solid var(--line-2);
+  background:var(--panel-2);color:var(--text);text-decoration:none;font-size:12px}
+.ov-chip small{color:var(--text-mute)}.ov-chip small.stale{color:var(--amber);font-weight:700}
+.ov-none{font-size:12px;color:var(--text-mute)}
+.ov-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+.ov-row .up{color:var(--red);font-weight:700}.ov-row .down{color:var(--green);font-weight:700}
+.ov-locked{font-size:13px;line-height:1.7;color:var(--text-mute)}
+.heat-map{position:relative;overflow:hidden;border-radius:14px;background:var(--heat-bg);border:1px solid var(--line);margin:0 auto;width:100%}
+.heat-canvas{position:absolute;left:0;top:0;transform-origin:0 0;background:var(--heat-bg)}
+.heat-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin:0 auto;width:100%;font-size:12px;color:var(--text-mute)}
+.matrix td small{display:block;font-weight:400;color:var(--text-mute)}
+.tdcc-list{display:grid;gap:6px;max-width:1100px;margin:0 auto}
+.tdcc-head,.tdcc-sum{display:grid;grid-template-columns:minmax(190px,2.2fr) repeat(4,minmax(74px,1fr)) 14px;align-items:center;gap:10px}
+.tdcc-head{padding:0 16px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text-mute)}
+.tdcc-head span{text-align:right}.tdcc-head span:first-child{text-align:left}
+.tdcc-row{border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.tdcc-row[open]{box-shadow:var(--shadow)}
+.tdcc-sum{padding:10px 16px;cursor:pointer;list-style:none}.tdcc-sum::-webkit-details-marker{display:none}
+.tdcc-who{display:flex;align-items:baseline;gap:8px;min-width:0}.tdcc-who b{font-size:15px}
+.tdcc-who .nm{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tdcc-r{text-align:right;font-weight:700}.tdcc-d{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.tdcc-d.up{color:var(--red)}.tdcc-d.down{color:var(--green)}.tdcc-d.na{color:var(--text-mute);font-weight:400}
+.tdcc-chev{color:var(--text-mute);transition:transform .15s}.tdcc-row[open] .tdcc-chev{transform:rotate(90deg)}
+.tdcc-more{display:grid;gap:8px;padding:10px 16px 14px;border-top:1px solid var(--line)}
+.tdcc-note{padding:10px 14px;border:1px dashed var(--line-2);border-radius:12px;font-size:12px;line-height:1.7;color:var(--text-mute)}
+.tdcc-ds{display:contents}
+@media(max-width:700px){.tdcc-head{display:none}
+  .tdcc-sum{grid-template-columns:1fr auto 14px;grid-template-areas:"who r chev" "d d d";row-gap:6px}
+  .tdcc-who{grid-area:who}.tdcc-r{grid-area:r}.tdcc-chev{grid-area:chev}
+  .tdcc-ds{grid-area:d;display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:flex-start}
+  .tdcc-d{white-space:nowrap}.tdcc-d::before{content:attr(data-l) " ";color:var(--text-mute);font-weight:400}}
+.heat-tile{position:absolute;box-sizing:border-box;border:2px solid #0f172a;margin:0;padding:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;overflow:hidden;font-family:inherit;line-height:1.15;text-align:center}
+.heat-tile.active{box-shadow:inset 0 0 0 4px #2f6fed}.heat-tile .n{font-weight:700;white-space:nowrap}.heat-tile .v{white-space:nowrap}
+.heat-tile .vert{writing-mode:vertical-rl;text-orientation:upright;font-weight:700;letter-spacing:1px}
+.latest-strip{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 24px;border-bottom:1px solid var(--line);font-size:12px;color:var(--text-mute)}
+.latest-strip b{color:var(--text-dim);font-weight:600}
+.scan-hint{margin:10px 24px 0;font-size:12px;line-height:1.6;color:var(--text-mute)}.scan-hint:empty{display:none}
+.sidebar{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent;overscroll-behavior:contain}
+.sidebar::-webkit-scrollbar{width:8px}.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px}
+#cards-area.cards-grid{zoom:var(--card-scale,1)}
+.heat-detail{border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:14px 16px;overflow-x:auto}
+.heat-detail h3{margin:0 0 6px}.matrix{width:100%;border-collapse:collapse;font-size:13px}
+.matrix th,.matrix td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.matrix td.sig{color:var(--red);font-weight:700}.matrix td.code{font-weight:700}
+.spark{width:120px;height:30px;color:var(--blue)}.more-btn{grid-column:1/-1;justify-self:center;padding:12px 18px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="side-panel" tabindex="-1" aria-label="篩選條件">
+    <div class="side-header">
+      <div class="brand"><span class="brand-dot"></span><span>台股 DMI / MACD</span></div>
+      <button id="theme-btn" class="theme-btn" type="button">夜間</button>
+    </div>
+    <div id="data-chip" class="data-chip">讀取資料中…</div>
+    <div class="section" id="slot-section" hidden><div class="section-label">資料版本</div>
+      <div class="grid-2" id="slot-buttons"></div><div id="slot-hint" class="hint"></div></div>
+    <div class="section"><div class="section-label">模組</div><div class="grid-2" id="strategy-buttons"></div>
+      <div class="gate" id="gate">
+        <button id="gate-open" class="gate-link" type="button">解鎖其他功能</button>
+        <form id="gate-form" class="gate-form" hidden autocomplete="off">
+          <label class="gate-q" for="gate-input">題目：2017最大IPO(3個字)</label>
+          <div class="gate-row"><input id="gate-input" class="num-input" type="text" maxlength="40" aria-label="解鎖答案">
+            <button class="opt-btn" type="submit">解鎖</button></div>
+        </form>
+        <div id="gate-msg" class="gate-msg" role="status"></div>
+        <button id="gate-relock" class="gate-link" type="button" hidden>重新鎖定</button>
+      </div></div>
+    <div class="section" id="overview-section" hidden><div class="section-label">總覽條件</div>
+      <div class="hint">固定使用各模組既有的判定：DMI 確認金叉、MACD 金叉，最近 2 根內觸發，最新日 K 量 ≥ 1,000 張。週期依 日K → 240m → 60m → 30m → 15m 排列。不另設規則，也不另外下載行情；解鎖後加上熱門群組（當日漲幅前 5 名）與「命中股 × 集保（逾 400 張比例本週增加）」。</div></div>
+    <div class="section" id="tf-section"><div class="section-label">K 週期</div><div class="grid-2" id="timeframe-buttons"></div></div>
+    <div class="section" id="mode-section"><div class="section-label">DMI 模式</div><div class="grid-2" id="mode-buttons"></div></div>
+    <div class="section" id="window-section"><div class="section-label" id="window-label">幾根 K 棒內觸發</div>
+      <div class="range-row"><input id="window-slider" type="range" min="2" max="20" step="1" value="3" aria-label="幾根 K 棒內觸發"><span id="window-value" class="range-value">3 根內</span></div>
+      <div id="window-hint" class="hint"></div></div>
+    <div class="section" id="diff-section"><div class="section-label">DMI 差距上限</div>
+      <input id="diff-input" class="num-input" type="number" min="0" max="100" step="0.1" value="0" inputmode="decimal" aria-label="DMI 差距上限">
+      <div id="diff-hint" class="hint"></div></div>
+    <div class="section" id="tangle-section" hidden><div class="section-label">全糾結條件</div>
+      <input id="tangle-spread" class="num-input" type="number" min="0.1" max="20" step="0.1" value="1.5" inputmode="decimal" aria-label="四線 spread 上限">
+      <div class="hint">spread 上限：+DI、-DI、ADX、ADXR 四線最大值減最小值（0.1–20）</div>
+      <input id="tangle-start" class="num-input" type="date" min="2026-01-01" value="2026-01-01" aria-label="全糾結起始日" style="margin-top:10px">
+      <div class="hint">顯示起始日之後，最後一次四線糾結的 K 棒</div></div>
+    <div class="section" id="volume-section"><div class="section-label">最低成交量（最新日 K）</div><div class="grid-2" id="volume-buttons"></div></div>
+    <div class="section" id="tdcc-section" hidden><div class="section-label">集保篩選（逾 400 張比例）</div>
+      <div class="grid-2" id="tdcc-filter-buttons"></div>
+      <div class="hint">變化以「百分點」表示；歷史不足或缺週時不計算，也不會當成 0。持股集中度變化不等於主力買賣。</div></div>
+    <div class="section" id="heatmap-section" hidden><div class="section-label">群組熱力圖</div>
+      <div class="grid-2" id="heatmap-view-buttons"></div>
+      <div class="hint">盤後快照，非即時行情。點選群組可看成員在「近 2 個交易日」的 DMI／MACD 訊號，週期由左到右為 日K → 240m → 60m → 30m → 15m。</div></div>
+    <div class="section"><div class="section-label">卡片大小</div>
+      <div class="range-row"><input id="card-slider" type="range" min="80" max="130" step="1" value="100" aria-label="卡片大小"><span id="card-value" class="range-value">100%</span></div></div>
+    <div class="panel-foot"><button id="panel-done" class="opt-btn active" type="button">完成，看結果</button></div>
+  </aside>
+  <main class="content">
+    <div class="cond-bar" id="cond-bar">
+      <button id="cond-toggle" class="cond-toggle" type="button" aria-expanded="false" aria-controls="side-panel">
+        <span class="cond-text"><span class="cond-date" id="cond-date">讀取資料中…</span><span class="cond-sum" id="cond-sum"></span></span>
+        <span class="cond-open">篩選</span>
+      </button>
+    </div>
+    <div class="stats-bar">
+      <div class="stat-card"><div id="hits-value" class="stat-value">0</div><div id="hits-label" class="stat-label">命中</div></div>
+      <div class="stat-divider"></div>
+      <div class="stat-card"><div id="scan-value" class="stat-value">0</div><div id="scan-label" class="stat-label">掃描檔數</div></div>
+      <div class="stat-divider"></div>
+      <div class="stat-card"><div id="short-value" class="stat-value">0</div><div id="short-label" class="stat-label">資料不足</div></div>
+      <div id="meta" class="meta"></div>
+    </div>
+    <div id="latest-strip" class="latest-strip"></div>
+    <div id="stale-banner" class="banner stale" role="alert" hidden></div>
+    <div id="scan-hint" class="scan-hint"></div>
+    <div id="notice" class="banner note"></div>
+    <div class="tools-bar">
+      <input id="search-input" class="search" type="search" placeholder="搜尋代碼 / 股名…" aria-label="搜尋代碼或股名">
+      <select id="sort-select" class="sort-select" aria-label="結果排序"></select>
+    </div>
+    <div class="cards-wrap"><div id="cards-area" class="empty"><h3>讀取中…</h3><p>正在載入已預先算好的掃描結果。</p></div></div>
+    <div class="footer" id="footer"></div>
+  </main>
+</div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const TF_NAMES = {"1d":"日K","240m":"240m","60m":"60m","30m":"30m","15m":"15m"};
+const TF_ORDER = ["15m","30m","60m","240m","1d"];
+const MATRIX_TFS = ["1d", "240m", "60m", "30m", "15m"];  // group detail: day first, then shorter bars
+const HEAT_MAX = 1100;  // default treemap width on large screens (px); 「放大」 uses the full width
+const STRATEGY_NAMES = {dmi:"DMI", macd:"MACD"};
+const MODE_NAMES = {cross:"確認金叉", ready:"準備金叉", tangle:"全糾結"};
+const SCHEMA = 2;
+const state = {manifest:null, loadError:null, buildError:null, strategy:"dmi", timeframe:"1d", mode:"cross",
+               window:3, diffMax:0, minVolume:1000, tangleSpread:1.5, tangleStart:"2026-01-01",
+               result:null, data:{}, tangle:{}, symbols:null, module:"dmi", tdccFilter:"all", heatView:"day",
+               heatGroup:null, matrixReady:false, mod:{}, tdccLimit:120, unlocked:false, heatLarge:false,
+               slot:"left", slotMode:false, waiting:false, slots:null};
+// Two public slots (deploy/site_slots.py): 收盤確認版 = the site root, 盤中測試版 = live/. Each slot's manifest says
+// what it holds (slot.kind close / intraday / waiting, trade date, data time, coverage), its own stale_after, and
+// (slots) the kind and date of BOTH slots, so the switch names each button by date and state whichever slot is open.
+function slotBase(){ return state.slot === "right" ? "live/" : ""; }
+function shortDate(d){ const p = String(d || "").split("-"); return p.length === 3 ? Number(p[1]) + "/" + Number(p[2]) : String(d || ""); }
+const SLOT_STATES = {close: "收盤確認", intraday: "盤中暫定", waiting: "等待盤中"};
+function slotLabel(key){  // the open slot is named from its own manifest, the other one from that manifest's "slots"
+  const own = state.manifest && state.manifest.slot && state.manifest.slot.side === key ? state.manifest.slot : null;
+  const s = own || (state.slots && state.slots[key]);
+  if (!s || !s.trade_date || !SLOT_STATES[s.kind]) return key === "left" ? "收盤確認版" : "盤中測試版";  // before r6.3 manifests
+  return shortDate(s.trade_date) + " " + SLOT_STATES[s.kind];
+}
+function slotDataTo(s){  // most symbols' data time first; the full range includes stocks that barely traded
+  return s.data_to_median ? s.data_to_median + (s.data_to && s.data_to !== s.data_to_median ? "（全部檔 " + s.data_to + "）" : "") : s.data_to;
+}
+function slotTag(m){
+  const s = m && m.slot;
+  if (!s) return "盤後";
+  if (s.kind === "waiting") return "等待今日盤中結果";
+  if (s.side === "left") return "收盤確認";
+  if (s.kind === "close") return shortDate(s.trade_date) + " 收盤（已確認）";
+  return "盤中暫定" + (s.data_to_median || s.data_to ? "，資料截至約 " + (s.data_to_median || s.data_to) : "");
+}
+function slotHint(m){
+  const s = m && m.slot;
+  if (!s) return "";
+  if (s.kind === "waiting") return "盤中測試版：" + s.trade_date + " 盤中結果尚未產生（每個交易日約 12:40 更新一次）。收盤確認版不受影響。";
+  if (s.side === "left") {
+    const r = state.slots && state.slots.right;
+    return "收盤確認版：" + s.trade_date + " 收盤、已確認的結果。" + (r && r.kind === "close" && r.trade_date > s.trade_date
+      ? "右邊已有 " + shortDate(r.trade_date) + " 收盤確認的結果；下一個交易日 08:30 移到這裡。" : "下一個交易日開盤前才換成更新的收盤。");
+  }
+  if (s.kind === "close") return "盤中測試版：" + s.trade_date + " 收盤、已確認（下一個交易日 08:30 移到左邊的收盤確認版）。";
+  const cov = s.coverage || {};
+  return "盤中測試版：" + s.trade_date + " 盤中暫定，非收盤結果。抓取 " + (s.fetched || "—") + "；多數檔資料截至約 " + (slotDataTo(s) || "—") +
+    "；涵蓋 今日日K " + (cov.daily ?? "—") + "／" + (cov.universe ?? "—") + " 檔、已完成 15 分 K " + (cov.m15 ?? "—") + "／" + (cov.universe ?? "—") +
+    " 檔。日K／240m／60m／30m 的最新一根是「若此刻收盤」；15m 只用已完成的 K 棒；量濾網用今日至今的成交量。" + (s.stopped ? " 抓取提早停止：" + s.stopped + "。" : "");
+}
+function renderSlots(){
+  $("slot-section").hidden = !state.slotMode;
+  if (!state.slotMode) return;
+  const box = $("slot-buttons"); box.replaceChildren();
+  ["left", "right"].forEach(key => {
+    const b = el("button", "opt-btn" + (state.slot === key ? " active" : ""), slotLabel(key));
+    b.type = "button"; b.setAttribute("aria-pressed", String(state.slot === key));
+    b.addEventListener("click", () => { if (state.slot !== key) switchSlot(key); });
+    box.append(b);
+  });
+  $("slot-hint").textContent = slotHint(state.manifest);
+}
+function switchSlot(key){
+  state.slot = key;
+  try { localStorage.setItem("dmiSiteSlot", key); } catch (e) {}
+  state.manifest = null; state.data = {}; state.tangle = {}; state.symbols = null; state.mod = {}; state.buildError = null;
+  renderSlots(); loadManifest();
+}
+function renderWaitingControls(){
+  // only the module choice (kept for when the slot gets data); every rule-dependent section is hidden
+  state.module = allowedModule(state.module, state.unlocked);
+  buttons("strategy-buttons", visibleModules(state.unlocked), state.module, x => MODULE_NAMES[x], v => {
+    if (v !== state.module) { state.module = allowedModule(v, state.unlocked); state.heatGroup = null; }
+    refresh();
+  }, ["overview"]);
+  ["overview-section", "tf-section", "mode-section", "window-section", "tangle-section", "diff-section", "volume-section",
+   "tdcc-section", "heatmap-section"].forEach(id => { $(id).hidden = true; });
+}
+function renderWaiting(){
+  const m = state.manifest;
+  setStats([["命中", "—"], ["掃描檔數", "—"], ["資料不足", "—"]]);
+  $("data-chip").textContent = "盤中測試版｜" + slotTag(m);
+  $("cond-date").textContent = slotLabel("right") + "｜盤中結果尚未產生";
+  $("cond-sum").textContent = "";
+  showError("今日盤中測試尚未產生", slotHint(m));
+}
+const DISCLAIMER = "本站為個人研究用途的盤後技術指標掃描結果，僅供參考，不構成投資建議；非即時資料，可能有誤或延遲；與臺灣證券交易所、證券櫃檯買賣中心及資料來源無關。";
+
+function setTheme(theme){
+  document.documentElement.setAttribute("data-theme", theme);
+  $("theme-btn").textContent = theme === "dark" ? "日間" : "夜間";
+  try { localStorage.setItem("dmiSiteTheme", theme); } catch (e) {}
+}
+function el(tag, cls, text){ const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
+
+function showStale(message){ const b = $("stale-banner"); b.textContent = "⚠ " + message; b.hidden = false; }
+// BEGIN staleReason (pure; exercised by deploy/tests/js/test_site_stale.mjs)
+function staleReason(m, nowMs, loadError){
+  if (!m) return "無法讀取資料清單（manifest.json），目前無法確認結果是否為最新。";
+  const shown = "目前顯示 " + (m.data_date || "未知日期") + " 的結果";
+  if (loadError) return "無法確認最新資料：重新讀取資料清單失敗（" + loadError + "），" + shown + "，可能已過期。";
+  const status = m.update_status;
+  if (status && status.stale === true) return status.message || ("資料已過期，" + shown + "。");
+  const deadline = Date.parse(m.stale_after);
+  if (!Number.isFinite(deadline) || nowMs > deadline)
+    return "資料未如期更新（預期最晚 " + (m.stale_after || "未知") + "），" + shown + "，可能已過期。";
+  return null;
+}
+// END staleReason
+function checkStale(){
+  const reason = state.buildError || staleReason(state.manifest, Date.now(), state.loadError);
+  if (reason) showStale(reason); else $("stale-banner").hidden = true;
+}
+
+// BEGIN signalRules (pure; mirrors deploy/site_signals.py match(); exercised by
+// deploy/tests/js/test_site_filter.mjs and deploy/tests/test_site_signals.py)
+const MIN_BARS = {dmi: 14, macd: 35};
+const READY_DEFAULT_LIMIT = 2.0;
+function matchSignal(row, strategy, mode, window, diffMax){
+  if (row.n < MIN_BARS[strategy] + window + 5) return {coverage: "short", trigger: null, ago: null};
+  const st = strategy === "dmi" ? row.d : row.m;
+  if (st.L < Math.max(window + 1, 3)) return {coverage: "short", trigger: null, ago: null};
+  const inWindow = typeof st.x === "number" && st.x <= window - 2;
+  if (strategy === "dmi" && mode === "ready") {
+    const limit = diffMax > 0 ? diffMax : READY_DEFAULT_LIMIT;
+    if (st.br === 1 && -st.diff <= limit && !inWindow && window <= st.run)  // gap is exactly -diff
+      return {coverage: "ready", trigger: st.rt !== undefined ? st.rt : row.lb, ago: 0};
+    return {coverage: "ready", trigger: null, ago: null};
+  }
+  if (strategy === "dmi") {
+    if (st.bc === 1 && inWindow && !(diffMax > 0 && st.diff > diffMax)) return {coverage: "ready", trigger: st.xt, ago: st.x};
+    return {coverage: "ready", trigger: null, ago: null};
+  }
+  if (st.b === 1 && inWindow) return {coverage: "ready", trigger: st.xt, ago: st.x};
+  return {coverage: "ready", trigger: null, ago: null};
+}
+// Phase 2 (mirrors site_signals.match_hotdog / match_tangle; faithful to Old DMI)
+const HOTDOG_MIN_BARS = 3;
+const TANGLE_MIN_BARS = 40;
+function matchHotdog(row, window){
+  if (row.n < HOTDOG_MIN_BARS) return {coverage: "short", trigger: null, ago: null};
+  const h = row.h;
+  if (h !== undefined && h.x <= window - 1) return {coverage: "ready", trigger: h.t[2], ago: h.x};
+  return {coverage: "ready", trigger: null, ago: null};
+}
+function matchTangle(row, records, spreadMax, start){
+  if (row.n < TANGLE_MIN_BARS) return {coverage: "short", trigger: null, record: null};
+  for (const rec of records || []) {
+    if (rec[1] <= spreadMax)
+      return rec[0] >= start ? {coverage: "ready", trigger: rec[0], record: rec} : {coverage: "ready", trigger: null, record: null};
+  }
+  return {coverage: "ready", trigger: null, record: null};
+}
+function expandTangle(data){
+  const out = {};
+  for (const symbol of Object.keys(data.rows))
+    out[symbol] = data.rows[symbol].map(r => [data.axis[r[0]], r[1], r[2], r[3], r[4], r[5]]);
+  return out;
+}
+function scanRows(rows, symbols, p, tangle){
+  const hits = []; let insufficient = 0;
+  for (const row of rows) {
+    let r;
+    if (p.strategy === "hotdog") r = matchHotdog(row, p.window);
+    else if (p.strategy === "dmi" && p.mode === "tangle") r = matchTangle(row, (tangle || {})[row.s], p.spreadMax, p.start);
+    else r = matchSignal(row, p.strategy, p.mode, p.window, p.diffMax);
+    if (r.coverage !== "ready") insufficient++;
+    const info = symbols[row.s];
+    if (r.trigger !== null && (p.minVolume === 0 || (info !== undefined && info.v === 1)))
+      hits.push({row: row, trigger: r.trigger, ago: r.ago === undefined ? null : r.ago, record: r.record || null});
+  }
+  hits.sort((a, b) => a.trigger < b.trigger ? 1 : (a.trigger > b.trigger ? -1 : 0));  // stable: newest first
+  return {hits: hits, insufficient: insufficient, universe: rows.length};
+}
+function sameBuild(manifest, data, kind){
+  return !!(manifest && data && data.schema === SCHEMA && manifest.schema === SCHEMA && data.kind === kind &&
+            typeof manifest.build_id === "string" && data.build_id === manifest.build_id);
+}
+// END signalRules
+
+// BEGIN moduleRules (pure; exercised by deploy/tests/js/test_site_modules.mjs)
+const TDCC_FILTERS = {all: "全部", w1up: "本週增加", w1down: "本週減少", w2up: "兩週淨增加", w4up: "四週淨增加",
+                      w1down_w2up: "本週減、兩週淨增"};
+function tdccMatches(row, filter){
+  const up = v => typeof v === "number" && v > 0, down = v => typeof v === "number" && v < 0;
+  if (filter === "w1up") return up(row.d1);
+  if (filter === "w1down") return down(row.d1);
+  if (filter === "w2up") return up(row.d2);
+  if (filter === "w4up") return up(row.d4);
+  if (filter === "w1down_w2up") return down(row.d1) && up(row.d2);
+  return true;
+}
+function tdccCompare(key){
+  const num = v => (typeof v === "number" ? v : -Infinity), byCode = (a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : 0);
+  const field = {ratio_desc: "r", d1_desc: "d1", d2_desc: "d2", d4_desc: "d4", bh_desc: "bh"}[key];
+  if (!field) return byCode;
+  return (a, b) => (num(b[field]) - num(a[field])) || byCode(a, b);
+}
+function signedPoints(v){ return typeof v === "number" ? (v > 0 ? "+" : "") + v.toFixed(2) + " 百分點" : null; }
+function groupOrder(groups, key){  // Robot's ranking: gains (largest first), losses (most negative first), ~0, then no value
+  const cls = x => (typeof x !== "number" ? 3 : x > 0.005 ? 0 : x < -0.005 ? 1 : 2);
+  return groups.slice().sort((a, b) => {
+    const ca = cls(a[key]), cb = cls(b[key]);
+    if (ca !== cb) return ca - cb;
+    if (ca === 0 && a[key] !== b[key]) return b[key] - a[key];
+    if (ca === 1 && a[key] !== b[key]) return a[key] - b[key];
+    return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+  });
+}
+function tileColor(value, scale){  // Taiwan convention: red = up, green = down; no value -> neutral
+  if (typeof value !== "number") return "var(--panel-2)";
+  const pct = Math.round(12 + 68 * Math.min(1, Math.abs(value) / scale));
+  return "color-mix(in srgb, " + (value >= 0 ? "var(--red)" : "var(--green)") + " " + pct + "%, var(--panel))";
+}
+function memberSignals(row, cutoff){  // one matrix cell: the existing DMI/MACD rules, timed by trading DATE
+  // A cross counts when its bar is on/after `cutoff` (the first of the last two official trading days) and the rule
+  // still holds now (DMI bc / MACD b, as in the modules); a missing bar never pulls in an earlier date.
+  // "ready" is the current state (the rule at its smallest window), not an event inside the two days.
+  if (!row) return {state: "none"};
+  const c = matchSignal(row, "dmi", "cross", 2, 0), m = matchSignal(row, "macd", "cross", 2, 0);
+  if (c.coverage === "short" && m.coverage === "short") return {state: "short"};
+  const recent = st => typeof st.xt === "string" && typeof cutoff === "string" && st.xt.slice(0, 10) >= cutoff;
+  return {state: "ok",
+          dmi: c.coverage === "ready" && row.d.bc === 1 && recent(row.d) ? row.d.xt : null,
+          ready: matchSignal(row, "dmi", "ready", 2, 0).trigger !== null,
+          macd: m.coverage === "ready" && row.m.b === 1 && recent(row.m) ? row.m.xt : null};
+}
+// Robot's group heatmap (group_fubon.render_group_heatmap_png), ported as pure functions: same weights,
+// order, recursive half-weight split, colors and text rules; the canvas is 1200x640 like the DC picture.
+const HEAT_CANVAS = {w: 1200, h: 640, pad: 18};
+function heatEntries(groups, key){
+  return groups.map(g => {
+    const v = typeof g[key] === "number" ? g[key] : null;
+    return {group: g, value: v, weight: Math.max(Math.abs(v === null ? 0 : v), 0.35)};
+  }).sort((a, b) => (b.weight - a.weight) || (a.group.name < b.group.name ? -1 : a.group.name > b.group.name ? 1 : 0));
+}
+function pyRound(x){  // Python's round(): halves go to the even neighbour (Robot rounds tile edges with it)
+  const f = Math.floor(x), d = x - f;
+  return d > 0.5 ? f + 1 : d < 0.5 ? f : (f % 2 === 0 ? f : f + 1);
+}
+function heatLayout(items, x, y, w, h){
+  if (!items.length) return [];
+  if (items.length === 1) return [{item: items[0], rect: [pyRound(x), pyRound(y), pyRound(x + w), pyRound(y + h)]}];
+  const total = items.reduce((s, it) => s + it.weight, 0), half = total / 2;
+  let running = 0, splitAt = 1, best = Infinity;
+  for (let i = 0; i < items.length - 1; i++) {
+    running += items[i].weight;
+    const delta = Math.abs(half - running);
+    if (delta < best) { best = delta; splitAt = i + 1; }
+  }
+  const left = items.slice(0, splitAt), right = items.slice(splitAt);
+  const ratio = total ? left.reduce((s, it) => s + it.weight, 0) / total : 0.5;
+  if (w >= h) { const w1 = w * ratio; return heatLayout(left, x, y, w1, h).concat(heatLayout(right, x + w1, y, w - w1, h)); }
+  const h1 = h * ratio;
+  return heatLayout(left, x, y, w, h1).concat(heatLayout(right, x, y + h1, w, h - h1));
+}
+function heatFill(v){
+  if (typeof v !== "number" || v === 0) return "#cbd5e1";
+  if (v > 0) return v >= 7 ? "#ef4444" : v >= 3 ? "#f87171" : "#fca5a5";
+  return v <= -7 ? "#10b981" : v <= -3 ? "#34d399" : "#86efac";
+}
+function heatInk(fill){
+  const r = parseInt(fill.slice(1, 3), 16), g = parseInt(fill.slice(3, 5), 16), b = parseInt(fill.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#0f172a" : "#ffffff";
+}
+function heatLabel(rect, name, pct, measure){
+  // -> {mode: "two"|"name"|"vertical"|"none", size, pctSize}; measure(text, px, bold) gives [width, height]
+  const tw = rect[2] - rect[0], th = rect[3] - rect[1];
+  const mx = tw >= 42 ? 5 : 2, my = th >= 42 ? 5 : 2, iw = Math.max(0, tw - 2 * mx), ih = Math.max(0, th - 2 * my);
+  if (iw < 14 || ih < 14) return {mode: "none"};
+  const cjk = /[㐀-鿿豈-﫿]/.test(name);
+  const nameOnly = () => {
+    const vertical = ih > iw * 1.35;
+    const fitsVertical = px => {
+      const chars = [...name].filter(c => c.trim());
+      const sizes = chars.map(c => measure(c, px, true));
+      return chars.length && Math.max(...sizes.map(s => s[0])) <= iw && sizes.reduce((s, x) => s + x[1], 0) + chars.length - 1 <= ih;
+    };
+    if (vertical && cjk) for (const px of [17, 15, 10]) if (fitsVertical(px)) return {mode: "vertical", size: px};
+    for (const px of [22, 17, 15, 10]) { const [nw, nh] = measure(name, px, true); if (nw <= iw && nh <= ih) return {mode: "name", size: px}; }
+    if (!vertical && cjk) for (const px of [15, 10]) if (fitsVertical(px)) return {mode: "vertical", size: px};
+    return {mode: "none"};
+  };
+  if (tw < 72 || th < 56) return nameOnly();
+  for (const [ns, ps, gap] of [[22, 20, 6], [17, 17, 4], [15, 13, 3]]) {
+    const [nw, nh] = measure(name, ns, true), [pw, ph] = measure(pct, ps, false);
+    if (nw <= iw && pw <= iw && nh + gap + ph <= ih) return {mode: "two", size: ns, pctSize: ps, gap: gap};
+  }
+  return nameOnly();
+}
+// END moduleRules
+
+// BEGIN overviewRules (pure; exercised by deploy/tests/js/test_site_overview.mjs)
+// 總覽: the existing rules at fixed settings over the already-exported files - nothing is re-scanned or downloaded.
+const OVERVIEW = {window: 2, diffMax: 0, minVolume: 1000, timeframes: ["1d", "240m", "60m", "30m", "15m"],
+                  sections: [["dmi", "cross"], ["macd", "cross"]], hotGroups: 5, tdccFilter: "w1up"};
+function overviewSection(dataByTf, symbols, strategy, mode){  // hits per timeframe, day first; a missing timeframe is skipped
+  return OVERVIEW.timeframes.filter(tf => dataByTf[tf]).map(tf => {
+    const r = scanRows(dataByTf[tf].rows, symbols, {strategy: strategy, mode: mode, window: OVERVIEW.window,
+                                                   diffMax: OVERVIEW.diffMax, minVolume: OVERVIEW.minVolume});
+    return {tf: tf, hits: r.hits.map(h => ({s: h.row.s, trigger: h.trigger, ago: h.ago, lb: h.row.lb})), universe: r.universe,
+            insufficient: r.insufficient};
+  });
+}
+function hotGroups(groups, n){  // the day's largest group averages (the DC tile values); a group without a value never ranks
+  return groups.filter(g => typeof g.avg === "number")
+    .sort((a, b) => (b.avg - a.avg) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)).slice(0, n);
+}
+function hitIndex(sections){  // symbol -> [[strategy, timeframe], ...] in section and timeframe order
+  const out = {};
+  sections.forEach(([strategy, tfs]) => tfs.forEach(t => t.hits.forEach(h => { (out[h.s] = out[h.s] || []).push([strategy, t.tf]); })));
+  return out;
+}
+function tdccCross(index, tdccRows, filter){  // hit stocks that also pass the existing TDCC filter (TDCC keys have no .TW/.TWO)
+  return Object.keys(index).map(s => ({s: s, code: s.replace(/\.(TW|TWO)$/i, ""), hits: index[s]}))
+    .filter(x => tdccRows[x.code] && tdccMatches(tdccRows[x.code], filter))
+    .map(x => ({s: x.s, code: x.code, hits: x.hits, tdcc: tdccRows[x.code]}))
+    .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+}
+// END overviewRules
+
+const MODULES = ["overview", "dmi", "macd", "tdcc", "heatmap"];
+// BEGIN gateRules (pure; exercised by deploy/tests/js/test_site_gate.mjs)
+// A friends-only entry step, NOT a login: the page and every data file stay public. Only the salted SHA-256 of the
+// answer is in the page. The unlock is kept under its own key, independent of the daily build, until 重新鎖定.
+const GATE_KEY = "dmiSiteUnlock", GATE_SALT = "dmi-site-gate-v1:";
+const GATE_HASH = "6a6ea97e8b40950858c6e5fd3482601d8c551f32b195b0772df06fd09d6c6813";
+const GATED = ["tdcc", "heatmap"];
+function sha256Hex(text){  // plain SHA-256 (FIPS 180-4) so the gate also works where crypto.subtle is unavailable
+  const bytes = new TextEncoder().encode(text), K = [], H = [];
+  const frac = x => (x - Math.floor(x)) * 4294967296 | 0;
+  for (let n = 2; K.length < 64; n++) {
+    let prime = true;
+    for (let d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; }
+    if (prime) { if (H.length < 8) H.push(frac(Math.sqrt(n))); K.push(frac(Math.cbrt(n))); }
+  }
+  const len = bytes.length, total = ((len + 8) >> 6) * 16 + 16, words = new Array(total).fill(0);
+  for (let i = 0; i < len; i++) words[i >> 2] |= bytes[i] << (24 - (i % 4) * 8);
+  words[len >> 2] |= 0x80 << (24 - (len % 4) * 8);
+  words[total - 1] = len * 8;
+  const rot = (x, n) => (x >>> n) | (x << (32 - n)), W = new Array(64);
+  for (let b = 0; b < total; b += 16) {
+    let [a, c, d, e, f, g, h, k] = H;
+    for (let i = 0; i < 64; i++) {
+      W[i] = i < 16 ? words[b + i] | 0 : (rot(W[i - 2], 17) ^ rot(W[i - 2], 19) ^ (W[i - 2] >>> 10)) + W[i - 7] +
+             (rot(W[i - 15], 7) ^ rot(W[i - 15], 18) ^ (W[i - 15] >>> 3)) + W[i - 16] | 0;
+      const t1 = k + (rot(f, 6) ^ rot(f, 11) ^ rot(f, 25)) + ((f & g) ^ (~f & h)) + K[i] + W[i] | 0;
+      const t2 = (rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + ((a & c) ^ (a & d) ^ (c & d)) | 0;
+      k = h; h = g; g = f; f = e + t1 | 0; e = d; d = c; c = a; a = t1 + t2 | 0;
+    }
+    [a, c, d, e, f, g, h, k].forEach((v, i) => { H[i] = H[i] + v | 0; });
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8, "0")).join("");
+}
+function gateAnswerOk(text){ return sha256Hex(GATE_SALT + String(text == null ? "" : text).trim()) === GATE_HASH; }
+function visibleModules(unlocked){ return unlocked ? MODULES.slice() : MODULES.filter(m => !GATED.includes(m)); }
+function allowedModule(mod, unlocked){ return visibleModules(unlocked).includes(mod) ? mod : "dmi"; }
+function readUnlock(storage){  // storage may be missing or throw (private mode, blocked site data)
+  try { return !!storage && storage.getItem(GATE_KEY) === GATE_HASH; } catch (e) { return false; }
+}
+function saveUnlock(storage){  // true = remembered; false = this visit only
+  try { storage.setItem(GATE_KEY, GATE_HASH); return storage.getItem(GATE_KEY) === GATE_HASH; } catch (e) { return false; }
+}
+function clearUnlock(storage){ try { storage.removeItem(GATE_KEY); } catch (e) {} }
+// END gateRules
+const MODULE_NAMES = {overview: "總覽", dmi: "DMI", macd: "MACD", tdcc: "集保", heatmap: "熱力圖"};
+const TDCC_PAGE = 120;
+const WHY = {history: "歷史不足", "missing-week": "缺該週資料", "not-listed-then": "前期無資料"};
+function buttons(container, values, current, label, onPick, wide){
+  const box = $(container); box.replaceChildren();
+  values.forEach(v => {
+    const b = el("button", "opt-btn" + (v === current ? " active" : "") + ((wide || []).includes(v) ? " wide" : ""), label(v));
+    b.type = "button"; b.addEventListener("click", () => onPick(v)); box.append(b);
+  });
+}
+function moduleStatus(name){ return ((state.manifest && state.manifest.modules) || {})[name] || {status: "off"}; }
+function renderControls(){
+  state.module = allowedModule(state.module, state.unlocked);  // a locked session never stays in tdcc / heatmap
+  const m = state.manifest, rules = m.rules, mod = state.module, sig = mod === "dmi" || mod === "macd";
+  state.strategy = sig ? mod : state.strategy;
+  document.body.classList.toggle("s-macd", mod === "macd");
+  buttons("strategy-buttons", visibleModules(state.unlocked), mod, x => MODULE_NAMES[x], v => {
+    if (v !== state.module) { state.module = allowedModule(v, state.unlocked); state.heatGroup = null; renderSortOptions(); }
+    refresh();
+  }, ["overview"]);
+  $("overview-section").hidden = mod !== "overview";
+  const tfs = TF_ORDER.filter(tf => m.files.timeframes[tf]);
+  if (!tfs.includes(state.timeframe)) state.timeframe = tfs.includes("1d") ? "1d" : tfs[0];
+  $("tf-section").hidden = !sig;
+  buttons("timeframe-buttons", tfs, state.timeframe, tf => TF_NAMES[tf] || tf, v => { state.timeframe = v; refresh(); });
+  $("mode-section").hidden = mod !== "dmi";
+  buttons("mode-buttons", ["cross", "ready", "tangle"], state.mode, md => MODE_NAMES[md], v => { state.mode = v; refresh(); });
+  const tangle = mod === "dmi" && state.mode === "tangle";
+  $("window-section").hidden = !sig || tangle;
+  $("tangle-section").hidden = !tangle;
+  const spreadInput = $("tangle-spread"), startInput = $("tangle-start");
+  spreadInput.min = rules.tangle_spread_min; spreadInput.max = rules.tangle_spread_max; spreadInput.value = state.tangleSpread;
+  startInput.min = rules.tangle_min_start; startInput.max = m.data_date || ""; startInput.value = state.tangleStart;
+  const slider = $("window-slider");
+  slider.min = rules.window_min; slider.max = rules.window_max; slider.value = state.window;
+  $("window-value").textContent = state.window + " 根內";
+  const ready = mod === "dmi" && state.mode === "ready";
+  $("window-label").textContent = ready ? "差距比較區間（近 N 根）" : "幾根 K 棒內觸發";
+  $("window-hint").textContent = ready
+    ? "準備金叉：目前差距須是近 " + state.window + " 根中最小，且這段期間沒有金叉。區間越大條件越嚴，命中可能變少。"
+    : "";
+  $("diff-section").hidden = mod !== "dmi" || state.mode === "tangle";
+  $("diff-hint").textContent = state.mode === "ready"
+    ? "0 = 預設 " + rules.ready_default_limit + "（準備金叉：-DI 高於 +DI 的差距上限）"
+    : "0 = 不限（確認金叉：+DI 高於 -DI 的差距上限）";
+  $("volume-section").hidden = !sig;
+  const vols = rules.min_volumes;
+  if (!vols.includes(state.minVolume)) state.minVolume = vols[0];
+  buttons("volume-buttons", vols, state.minVolume, v => v === 0 ? "不限" : "≥ " + v.toLocaleString() + " 張", v => { state.minVolume = v; refresh(); });
+  $("tdcc-section").hidden = mod !== "tdcc";
+  buttons("tdcc-filter-buttons", Object.keys(TDCC_FILTERS), state.tdccFilter, k => TDCC_FILTERS[k], v => { state.tdccFilter = v; refresh(); });
+  $("heatmap-section").hidden = mod !== "heatmap";
+  buttons("heatmap-view-buttons", ["day", "week"], state.heatView, v => v === "day" ? "當日" : "本週累積", v => { state.heatView = v; refresh(); });
+  updateCondBar();
+}
+function condSummary(){
+  const mod = state.module;
+  if (mod === "overview") return "總覽 · DMI／MACD 最近 2 根";
+  if (mod === "tdcc") return "集保 · " + TDCC_FILTERS[state.tdccFilter];
+  if (mod === "heatmap") return "熱力圖 · " + (state.heatView === "week" ? "本週累積" : "當日");
+  const parts = [MODULE_NAMES[mod], TF_NAMES[state.timeframe] || state.timeframe];
+  const tangle = mod === "dmi" && state.mode === "tangle";
+  if (mod === "dmi") parts.push(MODE_NAMES[state.mode]);
+  parts.push(tangle ? "spread ≤ " + state.tangleSpread : state.window + " 根內");
+  if (mod === "dmi" && !tangle && state.diffMax > 0) parts.push("差距 ≤ " + state.diffMax);
+  parts.push(state.minVolume ? "≥ " + state.minVolume.toLocaleString() + " 張" : "量不限");
+  return parts.join(" · ");
+}
+function updateCondBar(){
+  const m = state.manifest;
+  $("cond-date").textContent = !m ? "讀取資料中…" : state.slotMode && m.slot && m.slot.side
+    ? slotLabel(state.slot) + (m.slot.kind === "intraday" ? "｜資料截至約 " + (m.slot.data_to_median || m.slot.data_to || "—") : "")
+    : "資料日期 " + (m.data_date || "未知") + "｜" + slotTag(m);
+  $("cond-sum").textContent = m ? condSummary() : "";
+}
+async function fetchChecked(path, kind){
+  const m = state.manifest;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const url = slotBase() + path + "?b=" + encodeURIComponent(m.build_id) + (attempt ? "&r=" + attempt + "-" + Date.now() : "");
+    const response = await fetch(url, {cache: attempt ? "reload" : "default"});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
+    if (state.manifest !== m) throw new Error("資料清單已更新");
+    if (sameBuild(m, data, kind)) return data;
+  }
+  throw new Error("資料版本不一致（" + path + "）");
+}
+async function ensureSymbols(){
+  if (!state.symbols) state.symbols = (await fetchChecked(state.manifest.files.symbols, "symbols")).symbols;
+}
+async function ensureData(timeframe, needTangle){
+  const m = state.manifest;
+  await ensureSymbols();
+  if (!state.data[timeframe]) state.data[timeframe] = await fetchChecked(m.files.timeframes[timeframe], "timeframe");
+  if (needTangle && !state.tangle[timeframe])
+    state.tangle[timeframe] = expandTangle(await fetchChecked(m.files.tangle[timeframe], "tangle"));
+  return state.data[timeframe];
+}
+async function ensureModule(kind){
+  if (GATED.includes(kind) && !state.unlocked) throw new Error("此功能尚未解鎖");  // never download while locked
+  if (!state.mod[kind]) state.mod[kind] = await fetchChecked(state.manifest.files[kind], kind);
+  return state.mod[kind];
+}
+function hasField(name){ return state.manifest.fields.includes(name); }
+function renderSortOptions(){
+  const select = $("sort-select"), current = select.value;
+  let options;
+  if (state.module === "tdcc") options = [["ratio_desc", "逾 400 張比例高到低"], ["d1_desc", "本週增加最多"], ["d2_desc", "兩週增加最多"],
+                                          ["d4_desc", "四週增加最多"], ["bh_desc", "逾 400 張人數多到少"], ["ticker_asc", "代碼排序"]];
+  else if (state.module === "heatmap") options = [["group_rank", "面積依漲跌幅（同 DC）"]];
+  else if (state.module === "overview") options = [["overview", "依週期排列（日K → 15m）"]];
+  else {
+    options = [["trigger_desc", "最新觸發"], ["ticker_asc", "代碼排序"]];
+    if (hasField("volume")) options.push(["volume_desc", "成交量高到低"]);
+    if (hasField("close")) options.push(["close_desc", "收盤高到低"]);
+  }
+  select.replaceChildren(...options.map(([v, t]) => { const o = el("option", "", t); o.value = v; return o; }));
+  select.value = options.some(o => o[0] === current) ? current : options[0][0];
+}
+function fixed(value, digits){ return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "-"; }
+function agoText(ago){ return ago === 0 ? "最新一根" : ago + " 根前"; }
+function row(parent, label, value){ const r = el("div", "body-row"); r.append(el("div", "body-label", label), el("div", "body-value", value)); parent.append(r); }
+function setStats(pairs){
+  [["hits-value", "hits-label"], ["scan-value", "scan-label"], ["short-value", "short-label"]].forEach(([v, l], i) => {
+    $(v).textContent = pairs[i] ? pairs[i][1] : "-"; $(l).textContent = pairs[i] ? pairs[i][0] : "";
+  });
+}
+function quoteLink(code){
+  const a = el("a", "card"); a.href = "https://tw.stock.yahoo.com/quote/" + encodeURIComponent(code);
+  a.target = "_blank"; a.rel = "noopener noreferrer"; return a;
+}
+function cardHead(code, name, market){
+  const head = el("div", "card-head");
+  head.append(el("div", "card-code", code), el("div", "card-name", name || code),
+    el("span", "market-tag" + (market === "上櫃" ? " two" : ""), market || ""));
+  return head;
+}
+function staleNote(lb){  // label only (9/30 report): a hit whose own latest bar is older than the data date (no trade that day)
+  const m = state.manifest, d = String(lb || "").slice(0, 10);
+  return m && m.data_date && d && d < m.data_date ? "非 " + shortDate(m.data_date) + " 資料：最新 K 棒 " + shortDate(d) : "";
+}
+function card(hit){
+  const r = hit.row, info = state.symbols[r.s] || {};
+  const code = String(r.s).replace(/\.(TW|TWO)$/i, ""), market = /\.TWO$/i.test(r.s) ? "上櫃" : "上市";
+  const a = quoteLink(code);
+  const body = el("div", "card-body");
+  const stale = staleNote(r.lb);
+  if (stale) body.append(el("div", "card-stale", stale));
+  row(body, "觸發 K 棒", hit.trigger + (hit.ago === null ? "" : "（" + agoText(hit.ago) + "）"));
+  row(body, "最新 K 棒", r.lb);
+  if (r.c !== undefined) row(body, "最新收盤", Number(r.c).toFixed(2));
+  if (r.vol !== undefined) row(body, "K 量", Math.floor((Number(r.vol) || 0) / 1000).toLocaleString() + " 張");
+  if (info.dv !== undefined && info.dv !== null) row(body, "日 K 量", Math.floor(Number(info.dv) / 1000).toLocaleString() + " 張");
+  const foot = el("div", "card-footer");
+  if (state.module === "dmi" && hit.record) {
+    const g = hit.record;
+    foot.append(el("span", "chip lead", MODE_NAMES.tangle), el("span", "chip", "+DI " + fixed(g[2], 2)),
+      el("span", "chip", "-DI " + fixed(g[3], 2)), el("span", "chip", "ADX " + fixed(g[4], 2)),
+      el("span", "chip", "ADXR " + fixed(g[5], 2)), el("span", "chip", "spread " + fixed(g[1], 2)));
+  } else if (state.module === "dmi") {
+    const d = r.d;
+    foot.append(el("span", "chip lead", MODE_NAMES[state.mode]), el("span", "chip", "+DI " + fixed(d.dp, 2)),
+      el("span", "chip", "-DI " + fixed(d.dm, 2)), el("span", "chip", "差 " + fixed(d.diff, 2)),
+      el("span", "chip", "ADX " + fixed(d.adx, 2)), el("span", "chip", "ADXR " + fixed(d.adxr, 2)));
+  } else {
+    foot.append(el("span", "chip lead", "MACD 金叉"), el("span", "chip", "MACD " + fixed(r.m.macd, 4)),
+      el("span", "chip", "Signal " + fixed(r.m.sig, 4)));
+  }
+  a.append(cardHead(code, info.name, market), body, foot);
+  return a;
+}
+function sparkline(hist){
+  const pts = hist.filter(h => typeof h[1] === "number");
+  if (pts.length < 2) return el("div", "hint", "僅一期資料（" + (hist.length ? hist[hist.length - 1][0] : "-") + "），下週起顯示走勢");
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg"), line = document.createElementNS(ns, "polyline");
+  const vs = pts.map(p => p[1]), lo = Math.min(...vs), hi = Math.max(...vs), span = hi - lo || 1;
+  svg.setAttribute("viewBox", "0 0 100 30"); svg.setAttribute("class", "spark"); svg.setAttribute("preserveAspectRatio", "none");
+  line.setAttribute("points", pts.map((p, i) => (i * 100 / (pts.length - 1)).toFixed(1) + "," + (28 - (p[1] - lo) / span * 26).toFixed(1)).join(" "));
+  line.setAttribute("fill", "none"); line.setAttribute("stroke", "currentColor"); line.setAttribute("stroke-width", "1.5");
+  svg.append(line);
+  return svg;
+}
+function tdccRow(r){
+  const u = state.result.data.universe[r.s] || {}, det = el("details", "tdcc-row"), sum = el("summary", "tdcc-sum");
+  const who = el("div", "tdcc-who"), ds = el("div", "tdcc-ds");
+  who.append(el("b", "", r.s), el("span", "nm", u.name || ""), el("span", "market-tag" + (u.market === "上櫃" ? " two" : ""), u.market || ""));
+  [["d1", "本週"], ["d2", "兩週"], ["d4", "四週"]].forEach(([k, label]) => {
+    const v = r[k], d = el("span", "tdcc-d " + (typeof v === "number" ? (v > 0 ? "up" : v < 0 ? "down" : "") : "na"),
+      typeof v === "number" ? (v > 0 ? "+" : "") + v.toFixed(2) : "—");
+    d.dataset.l = label;
+    if (typeof v !== "number") d.title = WHY[r[k + "_why"]] || "無法計算";
+    ds.append(d);
+  });
+  sum.append(who, el("span", "tdcc-r", fixed(r.r, 2) + "%"), ds, el("span", "tdcc-chev", "›"));
+  const more = el("div", "tdcc-more");
+  row(more, "逾 400 張人數", (r.bh || 0).toLocaleString() + " 人");
+  row(more, "總持有人數", (r.h || 0).toLocaleString() + " 人");
+  [["d1", "本週變化"], ["d2", "兩週淨變化"], ["d4", "四週淨變化"]].forEach(([k, label]) =>
+    row(more, label, signedPoints(r[k]) || WHY[r[k + "_why"]] || "無法計算"));
+  const trend = el("div", "body-row");
+  trend.append(el("div", "body-label", "近期走勢"), sparkline(r.hist || []));
+  more.append(trend);
+  const foot = el("div", "card-footer");
+  foot.append(el("span", "chip lead", "集保 " + state.result.data.data_date));
+  (r.flags || []).forEach(f => foot.append(el("span", "chip", f === "adjust" ? "含差異數調整" : f.startsWith("denominator") ? "總股數變動 >10%（" + f.slice(12) + "）" : f)));
+  const link = el("a", "chip", "Yahoo 股市 ↗");
+  link.href = "https://tw.stock.yahoo.com/quote/" + encodeURIComponent(r.s); link.target = "_blank"; link.rel = "noopener noreferrer";
+  foot.append(link);
+  more.append(foot);
+  det.append(sum, more);
+  return det;
+}
+function tdccHistoryNote(data, rows){  // one note for the whole list instead of "無法計算" on every row
+  const missing = [["d1", "本週"], ["d2", "兩週"], ["d4", "四週"]].filter(([k]) => rows.length && rows.every(r => typeof r[k] !== "number"));
+  if (!missing.length) return null;
+  const d = data.data_date;
+  return el("div", "tdcc-note", "目前有 " + data.weeks.length + " 期集保資料（最新 " + d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6) +
+    "）；" + missing.map(m => m[1]).join("、") + "變化需要對應週的資料，暫時顯示「—」，不會當成 0。");
+}
+function tdccSourceNote(data){  // which weeks in use came from the verified archive rather than TDCC's endpoint
+  const src = data.week_sources || {}, archived = Object.keys(src).filter(d => src[d] !== "tdcc-official").sort();
+  if (!archived.length) return null;
+  const fmt = d => d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
+  return el("div", "tdcc-note", "資料來源：最新一週（" + fmt(data.data_date) + "）為集保官方開放資料；" + archived.map(fmt).join("、") +
+    " 由第三方歸檔回補（" + (data.source_notes || []).join("；") + "）。資料授權：政府資料開放授權條款第 1 版，來源臺灣集中保管結算所。");
+}
+function renderTdcc(area, q){
+  const data = state.result.data;
+  const list = state.result.rows.filter(r => tdccMatches(r, state.tdccFilter) &&
+    (r.s + " " + ((data.universe[r.s] || {}).name || "")).toLowerCase().includes(q));
+  list.sort(tdccCompare($("sort-select").value));
+  setStats([["符合", list.length], ["涵蓋檔數", state.result.rows.length], ["歷史週數", data.weeks.length]]);
+  const note = tdccHistoryNote(data, state.result.rows);
+  if (!list.length) {
+    area.className = "empty";
+    area.append(el("h3", "", "沒有符合條件的股票"),
+      el("p", "", data.weeks.length < 2 ? "目前只有 " + data.data_date + " 一期資料，變化類篩選要等有前一週的資料。" : "請調整篩選或搜尋。"));
+    return;
+  }
+  area.className = "tdcc-list";
+  if (note) area.append(note);
+  const source = tdccSourceNote(data);
+  if (source) area.append(source);
+  const head = el("div", "tdcc-head");
+  ["股票", "逾 400 張比例", "本週（百分點）", "兩週", "四週", ""].forEach(t => head.append(el("span", "", t)));
+  area.append(head);
+  list.slice(0, state.tdccLimit).forEach(r => area.append(tdccRow(r)));
+  if (list.length > state.tdccLimit) {  // render in pages: a phone should not build thousands of cards at once
+    const more = el("button", "quiet-btn more-btn", "顯示更多（已顯示 " + state.tdccLimit + "／" + list.length + " 檔）");
+    more.type = "button"; more.addEventListener("click", () => { state.tdccLimit += TDCC_PAGE; renderCards(); });
+    area.append(more);
+  }
+}
+function shortTime(t){ return String(t).slice(5, 16).replace("-", "/").replace(/:00$/, "").replace(" 00:00", ""); }
+function matrixTable(group, cutoff){
+  const table = el("table", "matrix"), head = el("tr");
+  ["代號", "名稱", ...MATRIX_TFS.map(tf => TF_NAMES[tf])].forEach(t => head.append(el("th", "", t)));
+  table.append(head);
+  group.members.forEach(symbol => {
+    const tr = el("tr"), code = symbol.replace(/\.(TW|TWO)$/i, "");
+    tr.append(el("td", "code", code), el("td", "", (state.symbols[symbol] || {}).name || "-"));
+    MATRIX_TFS.forEach(tf => {
+      const rows = (state.data[tf] || {}).rows || [];
+      const cell = memberSignals(rows.find(r => r.s === symbol), cutoff);
+      if (cell.state !== "ok") { tr.append(el("td", "", cell.state === "short" ? "資料不足" : "—")); return; }
+      const td = el("td", cell.dmi || cell.macd ? "sig" : "");
+      const add = (label, when) => { const d = el("div", "", label); if (when) d.append(el("small", "", shortTime(when))); td.append(d); };
+      if (cell.dmi) add("DMI 金叉", cell.dmi);
+      if (cell.macd) add("MACD 金叉", cell.macd);
+      if (cell.ready) add("DMI 準備（目前）");
+      if (!td.childNodes.length) td.textContent = "·";
+      tr.append(td);
+    });
+    table.append(tr);
+  });
+  return table;
+}
+let measureCtx = null;
+function measureText(text, px, bold){
+  if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
+  measureCtx.font = (bold ? "700 " : "400 ") + px + "px " + getComputedStyle(document.body).fontFamily;
+  return [measureCtx.measureText(String(text)).width, px * 1.18];
+}
+function heatTile(entry, rect, week, partKey){
+  const g = entry.group, v = entry.value, fill = heatFill(v), ink = heatInk(fill);
+  const pct = v === null ? "無資料" : (v > 0 ? "+" : "") + v.toFixed(2) + "%" + (g[partKey] ? "*" : "");
+  const b = el("button", "heat-tile" + (state.heatGroup === g.name ? " active" : ""));
+  b.type = "button";
+  Object.assign(b.style, {left: rect[0] + "px", top: rect[1] + "px", width: (rect[2] - rect[0]) + "px",
+                          height: (rect[3] - rect[1]) + "px", background: fill, color: ink});
+  b.title = g.name + " " + pct + "（" + (week ? g.week_n + " 檔" + (g.week_missing ? "，缺 " + g.week_missing : "")
+                                             : g.n + " 檔" + (g.missing ? "，缺 " + g.missing : "")) + "）";
+  const lab = heatLabel(rect, g.name, pct, measureText);
+  if (lab.mode === "two") {
+    const n = el("div", "n", g.name), t = el("div", "v", pct);
+    n.style.fontSize = lab.size + "px"; t.style.fontSize = lab.pctSize + "px"; t.style.marginTop = lab.gap + "px";
+    b.append(n, t);
+  } else if (lab.mode === "name" || lab.mode === "vertical") {
+    const n = el("div", lab.mode === "vertical" ? "vert" : "n", g.name);
+    n.style.fontSize = lab.size + "px";
+    b.append(n);
+  }
+  b.dataset.group = g.name;
+  b.addEventListener("click", () => selectHeatGroup(g.name));
+  return b;
+}
+function renderHeatmap(area, q){
+  const data = state.result.data, week = state.heatView === "week";
+  const key = week ? "week_avg" : "avg", missKey = week ? "week_missing" : "missing", partKey = week ? "week_partial" : "partial";
+  const members = g => (week ? g.week_members : g.members) || [];
+  const groups = data.groups.filter(g => members(g).length && (g.name + " " + members(g).join(" ")).toLowerCase().includes(q));
+  setStats([["群組", groups.length], ["成員", groups.reduce((s, g) => s + members(g).length, 0)],
+            ["缺值", week && data.week_status !== "ok" ? "-" : groups.reduce((s, g) => s + g[missKey], 0)]]);
+  area.className = "heat-wrap";
+  if (week && data.week_status !== "ok") {
+    area.append(el("div", "banner stale", data.week_status === "incomplete"
+      ? "本週累積不完整：" + data.week_missing_days.join("、") + " 是官方交易日，但沒有可用的官方收盤表（缺少或未通過驗證），因此不計算、不顯示數值（不會跳過該日繼續累積，也不當作 0%）。"
+      : "無法用官方交易日曆確認本週的交易日，不猜測休市，因此不顯示本週累積。" + (data.week_reason ? "（" + data.week_reason + "）" : "")));
+    return;
+  }
+  const full = area.clientWidth || $("cards-area").clientWidth || document.body.clientWidth;
+  const portrait = {w: 640, h: 960, pad: 12};  // phones: portrait keeps the labels readable
+  if (full > HEAT_MAX) {
+    const tools = el("div", "heat-tools"), size = el("button", "quiet-btn", state.heatLarge ? "縮小" : "放大");
+    size.type = "button"; size.id = "heat-size";
+    size.addEventListener("click", () => {
+      state.heatLarge = !state.heatLarge;
+      try { localStorage.setItem("dmiSiteHeatLarge", state.heatLarge ? "1" : "0"); } catch (e) {}
+      const y = window.scrollY; renderCards(); window.scrollTo(0, y);
+    });
+    tools.style.maxWidth = state.heatLarge ? "none" : HEAT_MAX + "px";  // aligned with the map's right edge
+    tools.append(el("span", "", state.heatLarge ? "目前：滿版" : "目前：標準寬度"), size);
+    area.append(tools);
+  }
+  const box = el("div", "heat-map"), inner = el("div", "heat-canvas");
+  box.style.maxWidth = state.heatLarge ? "none" : HEAT_MAX + "px";  // a capped, centred map unless 「放大」
+  const guess = state.heatLarge ? full : Math.min(full, HEAT_MAX), guessCanvas = guess < 700 ? portrait : HEAT_CANVAS;
+  box.style.height = Math.round(guessCanvas.h * guess / guessCanvas.w) + "px";  // provisional: a scrollbar may appear now
+  area.append(box);
+  const width = box.clientWidth || guess;  // measured after attaching, so the map never overflows its area
+  const canvas = width < 700 ? portrait : HEAT_CANVAS, scale = width / canvas.w;
+  box.style.height = Math.round(canvas.h * scale) + "px";
+  Object.assign(inner.style, {width: canvas.w + "px", height: canvas.h + "px", transform: "scale(" + scale + ")"});
+  heatLayout(heatEntries(groups, key), canvas.pad, canvas.pad, canvas.w - 2 * canvas.pad, canvas.h - 2 * canvas.pad)
+    .forEach(({item, rect}) => { if (rect[2] > rect[0] && rect[3] > rect[1]) inner.append(heatTile(item, rect, week, partKey)); });
+  box.append(inner);
+  const partial = groups.some(g => g[partKey]);
+  area.append(el("div", "hint", "紅＝上漲、綠＝下跌、灰＝平盤或無資料；面積依漲跌幅大小（同 DC 熱力圖）。" +
+    (partial ? "標 * 者為部分成員平均：有成員缺行情，未計入且不當成 0。" : "") + "點選群組可看成員的五週期訊號（附屬功能）。"));
+  const slot = el("div");
+  slot.id = "heat-detail-slot";
+  area.append(slot);
+  renderHeatDetail();
+}
+function renderHeatDetail(){  // only the member panel: the map, the scroll position and the focus stay as they are
+  const slot = $("heat-detail-slot");
+  if (!slot || !state.result || state.result.kind !== "heatmap") return null;
+  slot.replaceChildren();
+  const g = state.result.data.groups.find(x => x.name === state.heatGroup);
+  if (!g) return null;
+  const days = state.manifest.recent_trading_days || [], cutoff = days.length >= 2 ? days[days.length - 2] : null;
+  const detail = el("div", "heat-detail");
+  detail.append(el("h3", "", g.name + "（當日成員 " + g.members.length + " 檔）"));
+  if (!cutoff) detail.append(el("p", "hint", "無法用官方交易日曆確認最近兩個交易日，不猜測，因此暫不顯示成員訊號。"));
+  else {
+    detail.append(el("p", "hint", "近 2 個交易日（" + cutoff + "、" + days[days.length - 1] + "）的 DMI 確認金叉／MACD 金叉：依交易日期判斷，" +
+      "每個週期看同一段時間；金叉須到現在仍成立（同模組規則），缺棒不往前補。「準備」是目前狀態，不是兩天內發生的事件。"),
+      state.matrixReady ? matrixTable(g, cutoff) : el("p", "hint", "讀取五個週期的資料中…"));
+  }
+  slot.append(detail);
+  return detail;
+}
+function selectHeatGroup(name){
+  state.heatGroup = state.heatGroup === name ? null : name;
+  document.querySelectorAll("#cards-area .heat-tile").forEach(t => t.classList.toggle("active", t.dataset.group === state.heatGroup));
+  const detail = renderHeatDetail();
+  if (detail) detail.scrollIntoView({block: "nearest", behavior: "smooth"});  // moves only if the panel is off-screen
+  if (state.heatGroup && !state.matrixReady) loadMatrix();
+}
+async function loadMatrix(){
+  const seq = refreshSeq;
+  try {
+    for (const tf of MATRIX_TFS) await ensureData(tf, false);
+  } catch (e) {
+    if (seq === refreshSeq) { const slot = $("heat-detail-slot"); if (slot) slot.replaceChildren(el("p", "hint", "無法讀取週期資料：" + String(e.message || e))); }
+    return;
+  }
+  if (seq !== refreshSeq) return;
+  state.matrixReady = true;
+  renderHeatDetail();
+}
+function overviewChip(s, note, stale){
+  const code = s.replace(/\.(TW|TWO)$/i, ""), a = el("a", "ov-chip");
+  a.href = "https://tw.stock.yahoo.com/quote/" + encodeURIComponent(code); a.target = "_blank"; a.rel = "noopener noreferrer";
+  a.append(el("b", "", code), el("span", "", (state.symbols[s] || {}).name || ""));
+  if (note) a.append(el("small", "", note));
+  if (stale) a.append(el("small", "stale", stale));
+  return a;
+}
+function overviewWhere(hits){ return hits.map(([st, tf]) => STRATEGY_NAMES[st] + " " + TF_NAMES[tf]).join("、"); }
+function overviewHot(R, shows){
+  const sec = el("section", "ov-section"), m = state.manifest;
+  sec.append(el("h3", "", "熱門群組（當日漲幅前 " + OVERVIEW.hotGroups + " 名）"));
+  if (!R.heat || !R.heat.data) {
+    const off = R.heat && R.heat.off && R.heat.off.status === "unavailable";
+    sec.append(el("div", "ov-warn", R.heat && R.heat.error ? "無法讀取熱力圖資料：" + R.heat.error
+      : "這次發佈沒有熱力圖" + (off ? "（沒有可信的名單或已驗證的官方收盤表；這不是保留舊圖）" : "") + "，因此不列熱門群組。"));
+    return sec;
+  }
+  const h = R.heat.data;
+  sec.append(el("div", "ov-date", "官方收盤表 " + h.trade_date + "（取得 " + (h.official_fetched_at || "時間未知") +
+    "）· 名單：早晨備份時的目前群組名單（" + (h.membership_time || "時間未知") + "），不是 DC 此刻的名單"));
+  const warn = [(h.skipped_days || []).length ? "官方收盤表 " + h.skipped_days.join("、") + " 未通過驗證，改用 " + h.trade_date : "",
+    h.trade_date !== m.data_date ? "與 DMI 資料日期 " + m.data_date + " 不同" : "",
+    h.membership_current === false ? "今天的群組名單沒有更新" : ""].filter(Boolean);
+  if (warn.length) sec.append(el("div", "ov-warn", "⚠ " + warn.join("；") + "。"));
+  const top = hotGroups(h.groups, OVERVIEW.hotGroups);
+  if (!top.length) sec.append(el("span", "ov-none", "沒有可排名的群組"));
+  top.forEach((g, i) => {
+    const r = el("div", "ov-row"), v = g.avg, list = el("div", "ov-chips");
+    r.append(el("b", "", (i + 1) + ". " + g.name + (g.partial ? " *" : "")),
+      el("span", v > 0 ? "up" : v < 0 ? "down" : "", (v > 0 ? "+" : "") + v.toFixed(2) + "%"),
+      el("span", "ov-none", g.n + "／" + g.members.length + " 檔有官方行情"));
+    g.members.filter(s => R.index[s] && shows(s)).forEach(s => list.append(overviewChip(s, overviewWhere(R.index[s]))));
+    if (list.childNodes.length) r.append(list);
+    sec.append(r);
+  });
+  if (top.some(g => g.partial)) sec.append(el("div", "hint", "標 * 者為部分成員平均：有成員缺官方行情，未計入，也不當成 0。"));
+  return sec;
+}
+function overviewTdcc(R, cross, shows){
+  const sec = el("section", "ov-section"), m = state.manifest;
+  sec.append(el("h3", "", "命中股 × 集保（逾 400 張比例本週增加）"));
+  if (!R.tdcc || !R.tdcc.data) {
+    sec.append(el("div", "ov-warn", R.tdcc && R.tdcc.error ? "無法讀取集保資料：" + R.tdcc.error : "這次發佈沒有集保資料，因此不列交集。"));
+    return sec;
+  }
+  const t = R.tdcc.data, d = t.data_date;
+  sec.append(el("div", "ov-date", "集保資料日期 " + d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6) + "（每週）· 命中股依 DMI／MACD 資料日期 " + m.data_date));
+  if ((t.weeks || []).length < 2) {
+    sec.append(el("span", "ov-none", "目前只有一期集保資料，「本週增加」要等下週的資料才能判斷，因此暫無交集。"));
+    return sec;
+  }
+  const list = cross.filter(x => shows(x.s));
+  if (!list.length) sec.append(el("span", "ov-none", "本期沒有同時符合的股票"));
+  list.forEach(x => {
+    const r = el("div", "ov-row");
+    r.append(overviewChip(x.s, overviewWhere(x.hits)), el("span", "", "逾 400 張 " + fixed(x.tdcc.r, 2) + "%"),
+      el("span", "up", "本週 " + signedPoints(x.tdcc.d1)));
+    sec.append(r);
+  });
+  return sec;
+}
+function renderOverview(area, q){
+  const R = state.result, m = state.manifest;
+  const shows = s => (s + " " + ((state.symbols[s] || {}).name || "")).toLowerCase().includes(q);
+  const unique = st => new Set(R.sections.find(x => x[0] === st)[1].flatMap(t => t.hits.map(h => h.s))).size;
+  const cross = R.tdcc && R.tdcc.data ? tdccCross(R.index, R.tdcc.data.rows, OVERVIEW.tdccFilter) : null;
+  setStats([["DMI 命中", unique("dmi")], ["MACD 命中", unique("macd")], ["集保交集", cross ? cross.length : "-"]]);
+  area.className = "overview";
+  R.sections.forEach(([st, tfs]) => {
+    const sec = el("section", "ov-section");
+    sec.append(el("h3", "", (st === "dmi" ? "DMI 確認金叉" : "MACD 金叉") + "（最近 " + OVERVIEW.window + " 根）"),
+      el("div", "ov-date", "資料日期 " + m.data_date + "（" + slotTag(m) + "）；每個週期標出自己的最新 K 棒"));
+    tfs.forEach(t => {
+      const hits = t.hits.filter(h => shows(h.s)), blk = el("div", "ov-tf"), list = el("div", "ov-chips");
+      blk.append(el("div", "ov-tf-head", TF_NAMES[t.tf] + " · " + hits.length + " 檔 · 最新 K 棒 " + ((m.latest_bar || {})[t.tf] || "無") +
+        (t.insufficient ? " · 資料不足 " + t.insufficient + " 檔不參與判斷" : "")));
+      hits.forEach(h => list.append(overviewChip(h.s, agoText(h.ago), staleNote(h.lb) ? "非 " + shortDate(m.data_date) : "")));
+      if (!hits.length) list.append(el("span", "ov-none", q ? "沒有符合搜尋的命中" : "無命中"));
+      blk.append(list);
+      sec.append(blk);
+    });
+    area.append(sec);
+  });
+  if (!state.unlocked) {  // nothing gated was downloaded; say what unlocking adds
+    area.append(el("section", "ov-section ov-locked", "解鎖其他功能後，這裡會加上「熱門群組」與「命中股 × 集保」。未解鎖時不下載這兩份資料。"));
+    return;
+  }
+  area.append(overviewHot(R, shows), overviewTdcc(R, cross, shows));
+}
+function renderCards(){
+  const area = $("cards-area"), result = state.result;
+  if (!result) return;
+  const q = $("search-input").value.trim().toLowerCase();
+  area.replaceChildren();
+  if (result.kind === "overview") return renderOverview(area, q);
+  if (result.kind === "tdcc") return renderTdcc(area, q);
+  if (result.kind === "heatmap") return renderHeatmap(area, q);
+  const hits = result.hits.filter(h => (h.row.s + " " + ((state.symbols[h.row.s] || {}).name || "")).toLowerCase().includes(q));
+  const sort = $("sort-select").value;
+  if (sort === "ticker_asc") hits.sort((a, b) => a.row.s.localeCompare(b.row.s));
+  else if (sort === "volume_desc") hits.sort((a, b) => Number(b.row.vol) - Number(a.row.vol));
+  else if (sort === "close_desc") hits.sort((a, b) => Number(b.row.c) - Number(a.row.c));
+  if (!hits.length) {
+    area.className = "empty";
+    area.append(el("h3", "", q && result.hits.length ? "沒有符合搜尋的結果" : "這個條件沒有命中"),
+      el("p", "", "本次掃描 " + result.universe + " 檔；0 命中代表在此條件下沒有符合的股票。"));
+    return;
+  }
+  area.className = "cards-grid";
+  hits.forEach(h => area.append(card(h)));
+}
+function showError(title, message){
+  state.result = null;
+  const area = $("cards-area"); area.className = "empty";
+  area.replaceChildren(el("h3", "", title), el("p", "", message));
+}
+function moduleOff(name, label){
+  const st = moduleStatus(name);
+  setStats([]);
+  if (name === "heatmap" && st.status === "unavailable")  // withheld on purpose: no old image is shown in its place
+    return showError("熱力圖：暫停顯示",
+      "目前沒有可信的群組名單或已驗證的官方收盤表，所以這次發佈不含熱力圖。這不是保留舊圖：畫面上不會出現任何舊數字；" +
+      "資料恢復後會自動顯示。DMI／MACD 不受影響。（原因：" + (st.reason || "未記錄") + "）");
+  const why = st.status === "not-approved" ? "尚未核准公開（僅本機預覽可用）" : st.status === "unavailable" ? "資料暫時無法使用：" + (st.reason || "")
+    : "此網站版本未啟用";
+  showError(label + "：" + why, "其他模組不受影響。");
+}
+async function refreshSignals(seq){
+  const p = {strategy: state.module, mode: state.module === "dmi" ? state.mode : "cross",
+    window: state.window, diffMax: state.module === "dmi" ? state.diffMax : 0, minVolume: state.minVolume,
+    spreadMax: state.tangleSpread, start: state.tangleStart};
+  const tangle = p.strategy === "dmi" && p.mode === "tangle";
+  const what = tangle ? "DMI 全糾結 · spread ≤ " + p.spreadMax + " · " + p.start + " 起"
+    : MODULE_NAMES[p.strategy] + (p.strategy === "dmi" ? " " + MODE_NAMES[p.mode] : " 金叉") + " · " + p.window + " 根內" +
+      (p.strategy === "dmi" && p.diffMax > 0 ? " · 差距 ≤ " + p.diffMax : "");
+  $("meta").textContent = TF_NAMES[state.timeframe] + " · " + what + " · " +
+    (p.minVolume ? "日 K 量 ≥ " + p.minVolume.toLocaleString() + " 張" : "成交量不限");
+  const data = await ensureData(state.timeframe, tangle);
+  if (seq !== refreshSeq) return;
+  state.result = scanRows(data.rows, state.symbols, p, state.tangle[state.timeframe]);
+  setStats([["命中", state.result.hits.length], ["掃描檔數", state.result.universe], ["資料不足", state.result.insufficient]]);
+  const need = tangle ? TANGLE_MIN_BARS : MIN_BARS[p.strategy] + p.window + 5;
+  $("scan-hint").textContent = state.result.insufficient
+    ? "資料不足 " + state.result.insufficient + " 檔：可用 K 棒少於 " + need + " 根" + (tangle ? "" : "（" + (p.strategy === "dmi" ? "DMI 14" : "MACD 35") +
+      "＋視窗 " + p.window + "＋5）或有效指標不足") + "，這些股票不參與判斷，不等於未命中。"
+    : "";
+  renderCards();
+}
+async function refreshTdcc(seq){
+  $("scan-hint").textContent = "";
+  if (!state.manifest.files.tdcc) return moduleOff("tdcc", "集保");
+  const data = await ensureModule("tdcc");
+  if (seq !== refreshSeq) return;
+  const d = data.data_date;
+  $("meta").textContent = "集保 · 逾 400 張持股 · 資料日期 " + d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6) +
+    "（每週）· 已累積 " + data.weeks.length + " 週" + (data.missing_weeks.length ? " · 有缺週" : "") + " · 篩選：" + TDCC_FILTERS[state.tdccFilter];
+  state.result = {kind: "tdcc", data, rows: Object.entries(data.rows).map(([s, r]) => Object.assign({s}, r))};
+  state.tdccLimit = TDCC_PAGE;
+  renderCards();
+}
+async function refreshHeatmap(seq){
+  $("scan-hint").textContent = "";
+  if (!state.manifest.files.heatmap) return moduleOff("heatmap", "熱力圖");
+  const data = await ensureModule("heatmap");
+  await ensureSymbols();
+  if (seq !== refreshSeq) return;
+  const st = moduleStatus("heatmap");
+  const exp = data.week_expected_dates || [];
+  $("meta").textContent = "熱力圖 · 官方盤後收盤（非即時）· " + (state.heatView === "week"
+      ? "本週累積 " + (exp.length ? exp[0] + "～" + exp[exp.length - 1] : data.week_start + " 起")
+      : "當日 " + data.trade_date) +
+    " · 名單：早晨備份時的目前群組名單（" + (data.membership_time || "時間未知") + "），不是 DC 此刻的名單" +
+    " · 官方收盤表 " + data.trade_date + "（取得 " + (data.official_fetched_at || "時間未知") + "）";
+  const skipped = data.skipped_days || [];
+  $("scan-hint").textContent = [
+    skipped.length ? "⚠ 官方收盤表 " + skipped.join("、") + " 未通過驗證，不採用（不當作 0%）；改用最近一個已驗證的交易日 " + data.trade_date +
+      "，與 DMI 資料日期 " + state.manifest.data_date + " 不同。"
+    : st.matches_dmi_date === false ? "⚠ 今日官方收盤表尚未取得或驗證失敗，顯示最近一個已驗證的交易日（" + data.trade_date + "），與 DMI 資料日期 " + state.manifest.data_date + " 不同。" : "",
+    data.membership_current === false ? "⚠ 今天的群組名單沒有更新，沿用 " + (data.membership_time || "較早") + " 的名單。" : "",
+    "與 DC 的數字只有在日期、名單與缺值處理都相同時才會一致。"].filter(Boolean).join(" ");
+  state.result = {kind: "heatmap", data};
+  state.matrixReady = false;
+  renderCards();
+  if (state.heatGroup) await loadMatrix();
+}
+async function refreshOverview(seq){
+  $("scan-hint").textContent = "";
+  const m = state.manifest, tfs = OVERVIEW.timeframes.filter(tf => m.files.timeframes[tf]);
+  $("meta").textContent = "總覽 · DMI 確認金叉／MACD 金叉 · 最近 " + OVERVIEW.window + " 根 · 日 K 量 ≥ " +
+    OVERVIEW.minVolume.toLocaleString() + " 張 · 週期 " + tfs.map(tf => TF_NAMES[tf]).join(" → ");
+  await ensureSymbols();
+  await Promise.all(tfs.map(tf => ensureData(tf, false)));
+  const extra = {};
+  if (state.unlocked) {  // gated data only after the passphrase; a failing module never hides DMI / MACD
+    for (const [kind, key] of [["heatmap", "heat"], ["tdcc", "tdcc"]]) {
+      if (!m.files[kind]) { extra[key] = {off: moduleStatus(kind)}; continue; }
+      try { extra[key] = {data: await ensureModule(kind)}; } catch (e) { extra[key] = {error: String(e.message || e)}; }
+    }
+  }
+  if (seq !== refreshSeq) return;
+  const sections = OVERVIEW.sections.map(([strategy, mode]) => [strategy, overviewSection(state.data, state.symbols, strategy, mode)]);
+  state.result = {kind: "overview", sections: sections, index: hitIndex(sections), heat: extra.heat, tdcc: extra.tdcc};
+  renderCards();
+}
+let refreshSeq = 0;
+async function refresh(){
+  const seq = ++refreshSeq;
+  // a waiting slot has no files/rules: never let a control read them (9/30: clicks threw and looked frozen)
+  if (state.waiting) { renderWaitingControls(); renderWaiting(); checkStale(); return; }
+  renderControls();
+  try {
+    if (state.module === "overview") await refreshOverview(seq);
+    else if (state.module === "tdcc") await refreshTdcc(seq);
+    else if (state.module === "heatmap") await refreshHeatmap(seq);
+    else await refreshSignals(seq);
+    if (seq === refreshSeq) state.buildError = null;
+  } catch (e) {
+    if (seq !== refreshSeq) return;
+    const message = String(e.message || e);
+    if (message.startsWith("資料版本不一致")) state.buildError = message + "：已拒絕顯示可能混用不同版本的結果，請稍後重新整理。";
+    showError("無法讀取這個條件的結果", message);
+  }
+  checkStale();
+}
+function renderInfo(){
+  const m = state.manifest;
+  $("data-chip").textContent = "資料日期 " + (m.data_date || "未知") + "｜" + (m.slot ? slotTag(m) : "盤後更新");
+  renderSlots();
+  updateCondBar();
+  const latest = $("latest-strip"); latest.replaceChildren(el("b", "", "各週期最新 K 棒"));
+  TF_ORDER.forEach(tf => latest.append(el("span", "", (TF_NAMES[tf] || tf) + " " + ((m.latest_bar || {})[tf] || "無"))));
+  const tdcc = moduleStatus("tdcc"), heat = moduleStatus("heatmap");
+  if (state.unlocked)
+    latest.append(el("span", "", "集保 " + (tdcc.data_date || (tdcc.status === "ok" ? "-" : "未啟用"))),
+                  el("span", "", "熱力圖 " + (heat.data_date ? heat.data_date + (heat.matches_dmi_date === false ? "（非 DMI 同日）" : "")
+                    : heat.status === "not-approved" ? "未核准公開" : heat.status === "unavailable" ? "暫停（無可信資料）" : "未啟用")));
+  latest.append(el("span", "", "產生 " + (m.generated_at || "未知")));
+  $("notice").textContent = (m.slot && m.slot.kind === "intraday" ? DISCLAIMER.replace("盤後", "盤中暫定（非收盤）") : DISCLAIMER) +
+    " 命中名單會隨下一個交易日的資料更新。";
+  $("footer").textContent = "指標：DMI（Wilder 14）、MACD（12/26/9）。集保資料：臺灣集中保管結算所開放資料（政府資料開放授權條款-第1版）。" +
+    "資料更新時間與過期狀態以本頁上方顯示為準。" + DISCLAIMER;
+  renderSortOptions();
+}
+function validManifest(m){
+  return !!(m && m.schema === SCHEMA && typeof m.build_id === "string" && m.files && m.files.symbols &&
+            m.files.timeframes && m.rules && Array.isArray(m.rules.min_volumes));
+}
+async function loadManifest(){
+  try {
+    const asked = state.slot;
+    const response = await fetch(slotBase() + "manifest.json", {cache: "no-cache"});
+    if (response.status === 404 && asked === "right") {  // no second slot published (single-site mode): show the root
+      state.slot = "left"; state.slotMode = false; renderSlots(); return loadManifest();
+    }
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const m = await response.json();
+    if (asked !== state.slot) return;  // the user switched slots while this was loading
+    if (m && m.slot) state.slotMode = true;
+    const slotsBefore = JSON.stringify(state.slots);
+    if (m && m.slots) state.slots = m.slots;
+    if (m && m.slot && m.slot.kind === "waiting") {
+      state.manifest = m; state.waiting = true; state.loadError = null; state.data = {}; state.symbols = null; state.mod = {};
+      renderSlots(); renderWaitingControls(); renderWaiting(); checkStale();
+      return;
+    }
+    state.waiting = false;
+    if (!validManifest(m)) throw new Error("網頁與資料版本不符，請重新整理頁面");
+    const changed = !state.manifest || state.manifest.build_id !== m.build_id || state.manifest.generated_at !== m.generated_at;
+    state.loadError = null;
+    if (changed) {
+      state.manifest = m; state.data = {}; state.tangle = {}; state.symbols = null; state.buildError = null; state.mod = {};
+      if (state.tangleStart < m.rules.tangle_min_start || (m.data_date && state.tangleStart > m.data_date))
+        state.tangleStart = m.rules.tangle_min_start;
+      if (state.window < m.rules.window_min || state.window > m.rules.window_max) state.window = m.rules.default_window;
+      renderInfo(); await refresh();
+    } else if (JSON.stringify(state.slots) !== slotsBefore) {  // same data here, but the other slot changed (e.g. RIGHT got the close)
+      renderSlots(); updateCondBar();
+    }
+  } catch (e) {
+    state.loadError = String(e.message || e);  // keep the old view, but say it can no longer be confirmed
+    if (!state.manifest) showError("無法讀取掃描結果", state.loadError);
+  }
+  checkStale();
+}
+let cardFrame = 0, cardPending = 100;
+function applyCardScale(pct){
+  cardPending = Math.min(130, Math.max(80, Math.round(Number(pct) || 100)));
+  if (cardFrame) return;
+  cardFrame = requestAnimationFrame(() => {  // coalesce slider input into one style write per frame
+    cardFrame = 0;
+    document.documentElement.style.setProperty("--card-scale", (cardPending / 100).toFixed(2));
+    $("card-value").textContent = cardPending + "%";
+  });
+}
+function saveCardScale(){  // on release: apply the final value now (no frame needed), then persist once
+  if (cardFrame) { cancelAnimationFrame(cardFrame); cardFrame = 0; }
+  cardPending = Math.min(130, Math.max(80, Math.round(Number($("card-slider").value) || 100)));
+  document.documentElement.style.setProperty("--card-scale", (cardPending / 100).toFixed(2));
+  $("card-value").textContent = cardPending + "%";
+  try { localStorage.setItem("dmiSiteCardScale", String(cardPending)); } catch (e) {}
+}
+$("theme-btn").addEventListener("click", () => setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark"));
+const narrow = window.matchMedia("(max-width: 980px)");
+function setPanel(open){
+  if (open && !narrow.matches) return;
+  if (open) document.documentElement.style.setProperty("--panel-top", Math.round($("cond-bar").getBoundingClientRect().bottom) + "px");
+  document.body.classList.toggle("panel-open", open);
+  $("cond-toggle").setAttribute("aria-expanded", String(open));
+  if (open) $("side-panel").focus({preventScroll: true});
+  else if (document.activeElement && $("side-panel").contains(document.activeElement)) $("cond-toggle").focus({preventScroll: true});
+}
+$("cond-toggle").addEventListener("click", () => setPanel(!document.body.classList.contains("panel-open")));
+$("panel-done").addEventListener("click", () => setPanel(false));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.body.classList.contains("panel-open")) setPanel(false); });
+narrow.addEventListener("change", () => { if (!narrow.matches) setPanel(false); });
+$("search-input").addEventListener("input", renderCards);
+$("sort-select").addEventListener("change", renderCards);
+$("window-slider").addEventListener("input", e => { state.window = Number(e.target.value); if (state.manifest) refresh(); });
+$("diff-input").addEventListener("change", e => {
+  const value = Number(e.target.value);
+  state.diffMax = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
+  e.target.value = state.diffMax;
+  if (state.manifest) refresh();
+});
+$("card-slider").addEventListener("input", e => applyCardScale(e.target.value));
+$("card-slider").addEventListener("change", saveCardScale);
+$("tangle-spread").addEventListener("change", e => {
+  const rules = state.manifest ? state.manifest.rules : {tangle_spread_min: 0.1, tangle_spread_max: 20, tangle_default_spread: 1.5};
+  const value = Number(e.target.value);
+  state.tangleSpread = Number.isFinite(value) && e.target.value !== ""
+    ? Math.min(rules.tangle_spread_max, Math.max(rules.tangle_spread_min, value)) : rules.tangle_default_spread;
+  e.target.value = state.tangleSpread;
+  if (state.manifest) refresh();
+});
+$("tangle-start").addEventListener("change", e => {
+  const m = state.manifest, value = e.target.value;
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(value) && (!m || (value >= m.rules.tangle_min_start && (!m.data_date || value <= m.data_date)));
+  state.tangleStart = ok ? value : (m ? m.rules.tangle_min_start : "2026-01-01");
+  e.target.value = state.tangleStart;
+  if (state.manifest) refresh();
+});
+function renderGate(message, kind){
+  $("gate-open").hidden = state.unlocked;
+  $("gate-relock").hidden = !state.unlocked;
+  if (state.unlocked) $("gate-form").hidden = true;
+  const msg = $("gate-msg");
+  msg.textContent = message || (state.unlocked ? "已解鎖：集保、熱力圖。" : "");
+  msg.className = "gate-msg" + (kind ? " " + kind : "");
+}
+function gateStorage(){ try { return window.localStorage; } catch (e) { return null; } }
+$("gate-open").addEventListener("click", () => {
+  $("gate-form").hidden = !$("gate-form").hidden;
+  if (!$("gate-form").hidden) $("gate-input").focus();
+});
+$("gate-form").addEventListener("submit", e => {
+  e.preventDefault();
+  if (!gateAnswerOk($("gate-input").value)) {
+    renderGate("答案不正確，請再試一次（三個字；前後空白會自動忽略）。", "bad");
+    return;
+  }
+  $("gate-input").value = "";
+  state.unlocked = true;
+  const remembered = saveUnlock(gateStorage());
+  renderGate(remembered ? "已解鎖：集保、熱力圖。" : "已解鎖，本次瀏覽可用；此瀏覽器無法儲存，重新整理後需再次輸入。", remembered ? "" : "warn");
+  if (state.manifest) { if (!state.waiting) renderInfo(); refresh(); }
+});
+$("gate-relock").addEventListener("click", () => {
+  clearUnlock(gateStorage());  // only this feature's key; theme and card size stay
+  state.unlocked = false;
+  delete state.mod.tdcc; delete state.mod.heatmap; state.heatGroup = null;
+  renderGate("已重新鎖定。");
+  if (state.manifest) { if (!state.waiting) renderInfo(); refresh(); }
+});
+state.unlocked = readUnlock(gateStorage());
+renderGate();
+let savedTheme = null, savedCard = null;
+try {
+  savedTheme = localStorage.getItem("dmiSiteTheme");
+  if (localStorage.getItem("dmiSiteSlot") === "right") state.slot = "right";
+  savedCard = localStorage.getItem("dmiSiteCardScale");
+  state.heatLarge = localStorage.getItem("dmiSiteHeatLarge") === "1";
+  const legacy = localStorage.getItem("dmiSiteCardSize");  // older px setting (240-400) -> percent of 300px
+  if (!savedCard && legacy) savedCard = String(Math.round(Number(legacy) / 3));
+} catch (e) {}
+setTheme(savedTheme === "dark" || (!savedTheme && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light");
+$("card-slider").value = Math.min(130, Math.max(80, Number(savedCard) || 100));
+applyCardScale($("card-slider").value);
+window.addEventListener("resize", () => { if (state.module === "heatmap" && state.result) renderCards(); });
+loadManifest();
+let lastManifestCheck = Date.now();
+setInterval(() => {  // 盤中測試版 is looked up every 2 minutes (its data changes during the day); the close every 10
+  if (state.slot === "right" || Date.now() - lastManifestCheck >= 10 * 60 * 1000) { lastManifestCheck = Date.now(); loadManifest(); }
+}, 2 * 60 * 1000);
+setInterval(checkStale, 60 * 1000);
+</script>
+</body>
+</html>

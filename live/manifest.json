@@ -1,0 +1,21 @@
+{
+ "schema": "waiting",
+ "data_date": null,
+ "slot": {
+  "side": "right",
+  "label": "盤中測試版",
+  "kind": "waiting",
+  "trade_date": "2026-10-23"
+ },
+ "stale_after": "2026-10-23T13:40+08:00",
+ "slots": {
+  "left": {
+   "kind": "close",
+   "trade_date": "2026-10-22"
+  },
+  "right": {
+   "kind": "waiting",
+   "trade_date": "2026-10-23"
+  }
+ }
+}

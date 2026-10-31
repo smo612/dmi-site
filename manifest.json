@@ -1,0 +1,120 @@
+{
+ "build_id": "f2f2feb5d9dd26d2",
+ "data_date": "2026-10-29",
+ "fields": [
+  "symbol",
+  "name",
+  "market",
+  "trigger_time",
+  "latest_bar",
+  "bar_count",
+  "details"
+ ],
+ "files": {
+  "heatmap": "data/heatmap.json",
+  "symbols": "data/symbols.json",
+  "tangle": {
+   "15m": "data/tangle-15m.json",
+   "1d": "data/tangle-1d.json",
+   "240m": "data/tangle-240m.json",
+   "30m": "data/tangle-30m.json",
+   "60m": "data/tangle-60m.json"
+  },
+  "tdcc": "data/tdcc.json",
+  "timeframes": {
+   "15m": "data/15m.json",
+   "1d": "data/1d.json",
+   "240m": "data/240m.json",
+   "30m": "data/30m.json",
+   "60m": "data/60m.json"
+  }
+ },
+ "generated_at": "2026-10-29T20:15:16+08:00",
+ "latest_bar": {
+  "15m": "2026-10-29 13:15:00",
+  "1d": "2026-10-29",
+  "240m": "2026-10-29 13:00:00",
+  "30m": "2026-10-29 13:00:00",
+  "60m": "2026-10-29 13:00:00"
+ },
+ "modules": {
+  "dmi": {
+   "data_date": "2026-10-29",
+   "status": "ok"
+  },
+  "heatmap": {
+   "data_date": "2026-10-29",
+   "matches_dmi_date": true,
+   "membership_current": true,
+   "membership_time": "2026-10-29T06:11:18+08:00",
+   "skipped_days": [],
+   "status": "ok",
+   "week_status": "ok"
+  },
+  "macd": {
+   "data_date": "2026-10-29",
+   "status": "ok"
+  },
+  "tdcc": {
+   "data_date": "2026-10-22",
+   "status": "ok",
+   "weeks": 9
+  }
+ },
+ "notice": "本站為個人研究用途的盤後技術指標掃描結果，僅供參考，不構成投資建議；非即時資料，可能有誤或延遲；與臺灣證券交易所、證券櫃檯買賣中心及資料來源無關。",
+ "recent_trading_days": [
+  "2026-10-21",
+  "2026-10-22",
+  "2026-10-27",
+  "2026-10-28",
+  "2026-10-29"
+ ],
+ "rules": {
+  "default_window": 3,
+  "min_volumes": [
+   1000,
+   0
+  ],
+  "ready_default_limit": 2.0,
+  "tangle_default_spread": 1.5,
+  "tangle_min_start": "2026-01-01",
+  "tangle_spread_max": 20.0,
+  "tangle_spread_min": 0.1,
+  "window_max": 20,
+  "window_min": 2
+ },
+ "schema": 2,
+ "stale_after": "2026-11-02T09:30+08:00",
+ "universe": {
+  "15m": 1987,
+  "1d": 1988,
+  "240m": 1981,
+  "30m": 1982,
+  "60m": 1982
+ },
+ "update_status": {
+  "attempt_finished_at": "2026-10-29T20:15:13+08:00",
+  "message": null,
+  "result": "up_to_date",
+  "stale": false
+ },
+ "slot": {
+  "side": "left",
+  "label": "收盤確認版",
+  "kind": "close",
+  "trade_date": "2026-10-29",
+  "build_id": "f2f2feb5d9dd26d2",
+  "verified": "gated daily update + publish checks",
+  "set_at": "2026-10-29T20:17:38+08:00"
+ },
+ "slots": {
+  "left": {
+   "kind": "close",
+   "trade_date": "2026-10-29"
+  },
+  "right": {
+   "kind": "close",
+   "trade_date": "2026-10-30"
+  }
+ }
+}
